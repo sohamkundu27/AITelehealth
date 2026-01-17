@@ -144,15 +144,19 @@ async function checkInteractionsBrowserbase(newDrug, existingDrugs) {
   }
 }
 
-const createToken = async () => {
-  const roomName = 'quick-chat-room';
-  const participantName = 'user-' + Math.floor(Math.random() * 10000);
+const createToken = async (role = 'patient', roomCode = '') => {
+  // Use room code if provided, otherwise use default room
+  const roomName = roomCode ? `room-${roomCode.toLowerCase()}` : 'quick-chat-room';
+  const participantName = `${role}-${Math.floor(Math.random() * 10000)}`;
 
   const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
     identity: participantName,
     ttl: '24h',
   });
   at.addGrant({ roomJoin: true, room: roomName });
+  
+  // Add metadata to identify role
+  at.metadata = JSON.stringify({ role, roomCode });
 
   return await at.toJwt();
 };
@@ -228,7 +232,9 @@ app.post('/check-interactions', async (req, res) => {
 
 app.get('/getToken', async (req, res) => {
   try {
-    const token = await createToken();
+    const role = req.query.role || 'patient'; // Default to 'patient', can be 'doctor' or 'patient'
+    const roomCode = req.query.room || ''; // Room code for joining specific rooms
+    const token = await createToken(role, roomCode);
     res.send(token);
   } catch (err) {
     console.error(err);
@@ -239,6 +245,12 @@ app.get('/getToken', async (req, res) => {
 // SPA and static files last
 app.use(express.static('dist'));
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port} (backend for PDF/LiveKit/conflict-check)`);
+const host = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for remote access
+app.listen(port, host, () => {
+  console.log(`Server listening on ${host}:${port} (backend for PDF/LiveKit/conflict-check)`);
+  if (host === '0.0.0.0') {
+    console.log(`🌐 Server is accessible from other devices on your network`);
+    console.log(`   Local: http://localhost:${port}`);
+    console.log(`   Network: http://[your-ip]:${port}`);
+  }
 });

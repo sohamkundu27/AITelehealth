@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { RealtimeVision } from '@overshoot/sdk';
+import { PatientDataSender } from './PatientDataSender';
 
 export function OvershootDemo() {
   const [result, setResult] = useState<string>("");
@@ -7,6 +8,8 @@ export function OvershootDemo() {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [overshootState, setOvershootState] = useState<'CONFUSION' | 'UNDERSTANDING' | undefined>();
+  const [overshootEvidence, setOvershootEvidence] = useState<string | undefined>();
   const visionRef = useRef<RealtimeVision | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
 
@@ -32,6 +35,25 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
         setDebugInfo(`Data rx: ${new Date().toLocaleTimeString()}`);
         if (data && data.result) {
           setResult(data.result);
+          
+          // Try to parse JSON result to extract state and evidence
+          try {
+            const parsed = JSON.parse(data.result);
+            if (parsed.current_state) {
+              setOvershootState(parsed.current_state);
+            }
+            if (parsed.visual_evidence) {
+              setOvershootEvidence(parsed.visual_evidence);
+            }
+          } catch {
+            // If not JSON, try to infer state from text
+            const lower = data.result.toLowerCase();
+            if (lower.includes('confusion') || lower.includes('confused')) {
+              setOvershootState('CONFUSION');
+            } else if (lower.includes('understanding') || lower.includes('understand')) {
+              setOvershootState('UNDERSTANDING');
+            }
+          }
         }
       },
       onError: (err: any) => {
@@ -119,7 +141,16 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
   };
 
   return (
-    <div className="overshoot-popup">
+    <>
+      {/* Send patient data to doctor via LiveKit */}
+      <PatientDataSender
+        overshootResult={result}
+        overshootState={overshootState}
+        overshootEvidence={overshootEvidence}
+        enabled={isRunning && !isDemoMode}
+      />
+      
+      <div className="overshoot-popup">
       <div className="overshoot-header">
         <div className="overshoot-status">
           <span className={`status-dot ${isRunning ? 'active' : ''}`} />
@@ -262,5 +293,6 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
         }
       `}</style>
     </div>
+    </>
   );
 }
