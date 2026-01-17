@@ -452,7 +452,87 @@ function App() {
       audio={true}
       data-lk-theme="default"
       style={{ height: '100vh', width: '100vw', background: '#000' }}
-      onDisconnected={() => console.log('Disconnected from room')}
+      onDisconnected={(reason) => {
+        console.log('Disconnected from room:', reason);
+      }}
+      onConnected={(room) => {
+        console.log('✅ Connected to room:', room.name);
+        console.log('Local participant:', room.localParticipant.identity);
+        console.log('Current participants:', room.participants.size);
+        
+        // Check local video/audio tracks
+        const localVideo = room.localParticipant.videoTrackPublications.size;
+        const localAudio = room.localParticipant.audioTrackPublications.size;
+        console.log('Local video tracks:', localVideo, 'Local audio tracks:', localAudio);
+        
+        // Log when participants join/leave
+        room.on('participantConnected', (participant) => {
+          console.log('👤 Participant joined:', participant.identity);
+          console.log('  Video tracks:', participant.videoTrackPublications.size);
+          console.log('  Audio tracks:', participant.audioTrackPublications.size);
+          
+          // Log each video track
+          participant.videoTrackPublications.forEach((pub) => {
+            console.log('  📹 Video track:', pub.trackSid, 'subscribed:', pub.isSubscribed);
+          });
+        });
+        
+        room.on('participantDisconnected', (participant) => {
+          console.log('👋 Participant left:', participant.identity);
+        });
+        
+        // Log when tracks are published
+        room.on('trackPublished', (publication, participant) => {
+          const who = participant?.identity || 'local';
+          console.log(`📹 Track published: ${publication.kind} by ${who}`, publication.trackSid);
+        });
+        
+        // Log when tracks are subscribed
+        room.on('trackSubscribed', (track, publication, participant) => {
+          const who = participant?.identity || 'local';
+          console.log(`👁️ Track subscribed: ${track.kind} from ${who}`, track.sid);
+        });
+        
+        // Check if camera/mic permissions are granted and ensure tracks are published
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+          .then((stream) => {
+            console.log('✅ Camera/mic permissions granted');
+            stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+            
+            // Ensure local participant has video/audio tracks
+            setTimeout(() => {
+              const localVideo = room.localParticipant.videoTrackPublications.size;
+              const localAudio = room.localParticipant.audioTrackPublications.size;
+              
+              if (localVideo === 0) {
+                console.warn('⚠️ No local video track published. Trying to enable camera...');
+                // LiveKitRoom should handle this, but log for debugging
+              }
+              if (localAudio === 0) {
+                console.warn('⚠️ No local audio track published. Trying to enable microphone...');
+              }
+            }, 2000);
+          })
+          .catch((err) => {
+            console.error('❌ Camera/mic permission denied:', err);
+            alert('Camera/microphone access is required for video calls. Please grant permissions and refresh.');
+          });
+        
+        // Force check participants after a delay
+        setTimeout(() => {
+          console.log('📊 Room status after 3 seconds:');
+          console.log('  Participants:', room.participants.size);
+          console.log('  Local video tracks:', room.localParticipant.videoTrackPublications.size);
+          console.log('  Local audio tracks:', room.localParticipant.audioTrackPublications.size);
+          
+          room.participants.forEach((participant) => {
+            console.log(`  ${participant.identity}:`, {
+              video: participant.videoTrackPublications.size,
+              audio: participant.audioTrackPublications.size
+            });
+          });
+        }, 3000);
+      }}
     >
       {/* Doctor-side components */}
       {role === 'doctor' && (

@@ -153,12 +153,24 @@ const createToken = async (role = 'patient', roomCode = '') => {
     identity: participantName,
     ttl: '24h',
   });
-  at.addGrant({ roomJoin: true, room: roomName });
+  
+  // Grant full permissions: join room, publish video/audio, subscribe to others
+  at.addGrant({ 
+    roomJoin: true, 
+    room: roomName,
+    canPublish: true,
+    canSubscribe: true,
+    canPublishData: true,
+    canUpdateMetadata: true
+  });
   
   // Add metadata to identify role
   at.metadata = JSON.stringify({ role, roomCode });
 
-  return await at.toJwt();
+  const token = await at.toJwt();
+  console.log(`✅ Token generated - Room: ${roomName}, Identity: ${participantName}, Permissions: publish/subscribe enabled`);
+  
+  return token;
 };
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
