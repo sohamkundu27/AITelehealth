@@ -1,9 +1,6 @@
 import { HfInference } from "@huggingface/inference";
-import dotenv from "dotenv";
 
-dotenv.config();
-
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+const hf = new HfInference(import.meta.env.VITE_HUGGINGFACE_API_KEY);
 
 /**
  * Fetches official labeling data for a specific drug from openFDA.

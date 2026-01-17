@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { PrescriptionSTT } from './PrescriptionSTT';
 import { ConflictCheckIndicator } from './ConflictCheckIndicator';
+import { DrugInfoModal } from './DrugInfoModal';
 
 /**
  * In-call layer: runs PrescriptionSTT and, when a drug is detected,
@@ -12,7 +13,7 @@ export function CallWithSTT() {
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
   const [currentDrug, setCurrentDrug] = useState<string | undefined>();
-  const [detectedDrug, setDetectedDrug] = useState<{ drug: string; timestamp: number } | null>(null);
+  const [showDrugModal, setShowDrugModal] = useState(false);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
     
@@ -23,9 +24,8 @@ export function CallWithSTT() {
     setIsChecking(true);
     setResult(null);
     
-    // Show popup on local screen immediately
-    setDetectedDrug({ drug, timestamp: Date.now() });
-    setTimeout(() => setDetectedDrug(null), 3000);
+    // Show modal on local screen
+    setShowDrugModal(true);
     
     // Broadcast to all participants
     if (room?.localParticipant) {
@@ -80,8 +80,8 @@ export function CallWithSTT() {
         
         if (message.type === 'drug_detected') {
           console.log('📡 ✅ Received drug detection from other participant:', message.drug);
-          setDetectedDrug({ drug: message.drug, timestamp: Date.now() });
-          setTimeout(() => setDetectedDrug(null), 3000);
+          setCurrentDrug(message.drug);
+          setShowDrugModal(true);
         }
       } catch (e) {
         console.warn('⚠️ Failed to parse incoming data:', e);
@@ -101,39 +101,10 @@ export function CallWithSTT() {
   return (
     <>
       <PrescriptionSTT onPrescriptionDetected={onPrescriptionDetected} />
-      {detectedDrug && (
-        <div className="drug-popup">
-          💊 Medication detected: <strong>{detectedDrug.drug}</strong>
-        </div>
+      {showDrugModal && currentDrug && (
+        <DrugInfoModal drug={currentDrug} onClose={() => setShowDrugModal(false)} />
       )}
       <ConflictCheckIndicator isChecking={isChecking} result={result} drug={currentDrug} />
-      <style>{`
-        .drug-popup {
-          position: fixed;
-          bottom: 20px;
-          right: 20px;
-          background: rgba(0, 200, 100, 0.95);
-          color: white;
-          padding: 16px 24px;
-          border-radius: 12px;
-          font-weight: bold;
-          z-index: 9999;
-          box-shadow: 0 8px 24px rgba(0, 200, 100, 0.4);
-          font-size: 14px;
-          animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          border-left: 4px solid rgba(255, 255, 255, 0.3);
-        }
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(400px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-      `}</style>
     </>
   );
 }

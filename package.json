@@ -13,6 +13,7 @@
   "dependencies": {
     "@arizeai/openinference-instrumentation-openai": "^4.0.5",
     "@browserbasehq/sdk": "^2.6.0",
+    "@huggingface/inference": "^4.13.9",
     "@livekit/components-react": "^2.9.19",
     "@livekit/components-styles": "^1.2.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.210.0",
