@@ -10,3 +10,9 @@ Use livekit for speech to text: https://cloud.livekit.io/projects/p_4cqu6b1dae7/
 https://docs.livekit.io/agents/start/voice-ai-quickstart/
 https://docs.livekit.io/agents/models/stt/
 
+VITE_OVERSHOOT_API_KEY=ovs_730ba8f7e4de121fbdf99b001414705f
+LIVEKIT_API_KEY=APIfFfbNjFLHAVA
+LIVEKIT_API_SECRET=2xyQjOiAVAdJeeSN8DQCjZorjRMoKwSyHOL9SfQd0FZA
+VITE_PUBLIC_LIVEKIT_URL=wss://nexhacks-uwr4zdqw.livekit.cloud
+
+ARIZE_API_KEY=ak-044f04bb-936b-4055-a8d2-459198a55f62-rThdWkcMKctzZCf7FAK7GXE9RZlgcWiM
