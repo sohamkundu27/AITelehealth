@@ -212,8 +212,8 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
     };
 
     const [purposeSummary, dosageSummary, warningsBullets, sideEffectsBullets, contraindictionsBullets, interactionsBullets] = await Promise.all([
-      condenseText(drugData.indications.join(" "), 100),
-      condenseText(drugData.dosage.join(" "), 25),
+      condenseText(drugData.indications.join(" "), 250),
+      condenseText(drugData.dosage.join(" "), 200),
       extractBulletsWithLLM(drugData.warnings, 4),
       extractBulletsWithLLM(drugData.adverse_reactions, 5),
       extractBulletsWithLLM(drugData.contraindications, 4),

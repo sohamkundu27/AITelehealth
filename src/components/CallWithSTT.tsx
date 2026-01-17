@@ -12,20 +12,17 @@ export function CallWithSTT() {
   const room = useRoomContext();
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
-  const [currentDrug, setCurrentDrug] = useState<string | undefined>();
-  const [showDrugModal, setShowDrugModal] = useState(false);
+  const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
     
 
     //Check Against Patient History (Unimplemented)
     console.log('💊 Checking interactions for:', drug);
-    setCurrentDrug(drug);
+    // Add drug to active list if not already present
+    setActiveDrugs(prev => prev.includes(drug) ? prev : [...prev, drug]);
     setIsChecking(true);
     setResult(null);
-    
-    // Show modal on local screen
-    setShowDrugModal(true);
     
     // Broadcast to all participants
     if (room?.localParticipant) {
@@ -80,8 +77,7 @@ export function CallWithSTT() {
         
         if (message.type === 'drug_detected') {
           console.log('📡 ✅ Received drug detection from other participant:', message.drug);
-          setCurrentDrug(message.drug);
-          setShowDrugModal(true);
+          setActiveDrugs(prev => prev.includes(message.drug) ? prev : [...prev, message.drug]);
         }
       } catch (e) {
         console.warn('⚠️ Failed to parse incoming data:', e);
@@ -98,13 +94,23 @@ export function CallWithSTT() {
     };
   }, [room]);
 
+  const closeDrugModal = (drug: string) => {
+    setActiveDrugs(prev => prev.filter(d => d !== drug));
+  };
+
   return (
     <>
       <PrescriptionSTT onPrescriptionDetected={onPrescriptionDetected} />
-      {showDrugModal && currentDrug && (
-        <DrugInfoModal drug={currentDrug} onClose={() => setShowDrugModal(false)} />
-      )}
-      <ConflictCheckIndicator isChecking={isChecking} result={result} drug={currentDrug} />
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', position: 'fixed', top: '20px', left: '20px', zIndex: 9999 }}>
+        {activeDrugs.map(drug => (
+          <DrugInfoModal 
+            key={drug} 
+            drug={drug} 
+            onClose={() => closeDrugModal(drug)} 
+          />
+        ))}
+      </div>
+      <ConflictCheckIndicator isChecking={isChecking} result={result} drug={activeDrugs[0]} />
     </>
   );
 }
