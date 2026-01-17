@@ -95,6 +95,7 @@ export function CallWithSTT() {
   }, [room]);
 
   const closeDrugModal = (drug: string) => {
+    console.log('Removing modal for:', drug);
     setActiveDrugs(prev => prev.filter(d => d !== drug));
   };
 
@@ -106,7 +107,7 @@ export function CallWithSTT() {
           <DrugInfoModal 
             key={drug} 
             drug={drug} 
-            onClose={() => closeDrugModal(drug)} 
+            onClose={() => closeDrugModal(drug)}
           />
         ))}
       </div>

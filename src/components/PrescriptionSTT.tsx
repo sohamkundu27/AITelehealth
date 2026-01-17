@@ -23,20 +23,24 @@ const COMMON_DRUGS = [
 ];
 
 /**
- * Simple list-based drug detection. Looks for known drug names in the transcript.
+ * Simple list-based drug detection. Looks for all known drug names in the transcript.
  */
-function extractDrug(transcript: string): string | null {
-  if (!transcript || transcript.length < 3) return null;
+function extractDrugs(transcript: string): string[] {
+  if (!transcript || transcript.length < 3) return [];
   const lower = transcript.toLowerCase();
+  const found: string[] = [];
   
-  // Search for any known drug name in the transcript
+  // Search for all known drug names in the transcript
   for (const drug of COMMON_DRUGS) {
     if (lower.includes(drug)) {
-      return drug.charAt(0).toUpperCase() + drug.slice(1); // Capitalize first letter
+      const capitalized = drug.charAt(0).toUpperCase() + drug.slice(1);
+      if (!found.includes(capitalized)) {
+        found.push(capitalized);
+      }
     }
   }
   
-  return null;
+  return found;
 }
 
 type Props = {
@@ -64,11 +68,13 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
       const t = (e.results?.[idx]?.[0]?.transcript || '').trim();
       if (!t) return;
       setLastTranscript(t);
-      const drug = extractDrug(t);
-      if (drug) {
+      const drugs = extractDrugs(t);
+      
+      // Process all detected drugs
+      for (const drug of drugs) {
         // Debounce: avoid firing for the same drug within 8s
         const key = drug.toLowerCase();
-        if (lastDrugRef.current === key) return;
+        if (lastDrugRef.current === key) continue;
         lastDrugRef.current = key;
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {

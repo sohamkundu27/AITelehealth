@@ -5,17 +5,28 @@ import './styles/DrugInfoModal.css';
 interface DrugInfoModalProps {
   drug: string;
   onClose: () => void;
+  isExiting?: boolean;
 }
 
-export function DrugInfoModal({ drug, onClose }: DrugInfoModalProps) {
+export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) {
   const [popupData, setPopupData] = useState<PopupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [internalExiting, setInternalExiting] = useState(false);
 
   const overlayStyle = { pointerEvents: 'none' as const };
   const modalStyle = {
     pointerEvents: 'auto' as const,
   };
+
+  const handleClose = () => {
+    setInternalExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 350); // Match animation duration
+  };
+
+  const isCurrentlyExiting = isExiting || internalExiting;
 
   useEffect(() => {
     const fetchDrugInfo = async () => {
@@ -39,10 +50,9 @@ export function DrugInfoModal({ drug, onClose }: DrugInfoModalProps) {
   if (loading) {
     return (
       <div className="drug-modal-overlay loading" style={overlayStyle}>
-        <div className="drug-modal compact-loading" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <div className={`drug-modal compact-loading ${isCurrentlyExiting ? 'exiting' : ''}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
           <div className="drug-modal-header">
             <h2>💊 Loading {drug}...</h2>
-            <button className="drug-modal-close" onClick={onClose}>✕</button>
           </div>
           <div className="drug-modal-loading">
             <div className="loading-spinner"></div>
@@ -57,10 +67,10 @@ export function DrugInfoModal({ drug, onClose }: DrugInfoModalProps) {
   if (error || !popupData) {
     return (
       <div className="drug-modal-overlay loaded" style={overlayStyle}>
-        <div className="drug-modal" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <div className={`drug-modal ${isCurrentlyExiting ? 'exiting' : ''}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
           <div className="drug-modal-header">
             <h2>💊 {drug}</h2>
-            <button className="drug-modal-close" onClick={onClose}>✕</button>
+            <button className="drug-modal-close" onClick={handleClose}>✕</button>
           </div>
           <div className="drug-modal-error">
             <p>{error || 'Unable to load medication information'}</p>
@@ -73,7 +83,7 @@ export function DrugInfoModal({ drug, onClose }: DrugInfoModalProps) {
 
   return (
     <div className="drug-modal-overlay loaded" style={overlayStyle}>
-      <div className="drug-modal" style={modalStyle} onClick={(e) => e.stopPropagation()}>
+      <div className={`drug-modal ${isCurrentlyExiting ? 'exiting' : ''}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div className="drug-modal-header">
           <div className="drug-modal-title">
             <h2>💊 {popupData.title}</h2>
@@ -81,7 +91,7 @@ export function DrugInfoModal({ drug, onClose }: DrugInfoModalProps) {
               <p className="drug-modal-generic">{popupData.generic_name}</p>
             )}
           </div>
-          <button className="drug-modal-close" onClick={onClose}>✕</button>
+          <button className="drug-modal-close" onClick={handleClose}>✕</button>
         </div>
 
         <div className="drug-modal-content">
