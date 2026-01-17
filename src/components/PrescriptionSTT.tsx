@@ -1,28 +1,41 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-const TRIGGERS = /\b(prescrib|prescription|recommend|prescribing|take\s+\w+|start\s+\w+|put you on|give you|we'll add|adding)\b/i;
-const DRUG_SUFFIX = /(olol|pril|cin|dipine|statin|cycline|mycin|prazole|formin|artan|azepam|oxetine|ide|done|pine|tidine|olone|tadine)$/i;
-const STOP = new Set(['the', 'a', 'an', 'and', 'for', 'with', 'you', 'your', 'some', 'twice', 'once', 'daily', 'mg', 'mcg', 'tablet', 'tablets', 'capsule', 'capsules', 'medicine', 'medication', 'drug']);
+const COMMON_DRUGS = [
+  'lisinopril', 'metoprolol', 'atorvastatin', 'omeprazole', 'metformin', 'sertraline', 'amlodipine', 'albuterol',
+  'levothyroxine', 'enalapril', 'hydrochlorothiazide', 'furosemide', 'simvastatin', 'amoxicillin', 'ibuprofen',
+  'acetaminophen', 'aspirin', 'warfarin', 'clopidogrel', 'losartan', 'valsartan', 'diltiazem', 'verapamil',
+  'propranolol', 'atenolol', 'bisoprolol', 'carvedilol', 'labetalol', 'pravastatin', 'rosuvastatin', 'fluoxetine',
+  'paroxetine', 'citalopram', 'escitalopram', 'venlafaxine', 'bupropion', 'duloxetine', 'tramadol', 'oxycodone',
+  'morphine', 'hydrocodone', 'codeine', 'gabapentin', 'pregabalin', 'amitriptyline', 'nortriptyline', 'doxepin',
+  'zolpidem', 'eszopiclone', 'zaleplon', 'lorazepam', 'alprazolam', 'diazepam', 'clonazepam', 'methotrexate',
+  'prednisone', 'dexamethasone', 'hydrocortisone', 'insulin', 'glipizide', 'glyburide', 'pioglitazone', 'sitagliptin',
+  'donepezil', 'memantine', 'levodopa', 'carbidopa', 'ropinirole', 'bromocriptine', 'tamsulosin', 'finasteride',
+  'sildenafil', 'tadalafil', 'ciprofloxacin', 'levofloxacin', 'azithromycin', 'doxycycline', 'tetracycline', 'cephalexin',
+  'penicillin', 'erythromycin', 'clarithromycin', 'metronidazole', 'nystatin', 'fluconazole', 'itraconazole', 'ketoconazole',
+  'acyclovir', 'valacyclovir', 'oseltamivir', 'zanamivir', 'amantadine', 'rimantadine', 'ritonavir', 'lopinavir',
+  'darunavir', 'atazanavir', 'efavirenz', 'rilpivirine', 'dolutegravir', 'bictegravir', 'cabotegravir', 'tenofovir',
+  'lamivudine', 'emtricitabine', 'abacavir', 'zidovudine', 'didanosine', 'stavudine', 'zalcitabine', 'nevirapine',
+  'delavirdine', 'maraviroc', 'enfuvirtide', 'ibalizumab', 'fostemsavir', 'letermovir', 'ganciclovir', 'valganciclovir',
+  'cidofovir', 'foscarnet', 'famciclovir', 'penciclovir', 'trifluridine', 'idoxuridine', 'podofilox', 'imiquimod',
+  'sinecatechins', 'podophyllin', 'cryotherapy', 'interferon', 'peginterferon', 'ribavirin', 'sofosbuvir', 'ledipasvir',
+  'velpatasvir', 'voxilaprevir', 'glecaprevir', 'pibrentasvir', 'simeprevir', 'boceprevir', 'telaprevir', 'danoprevir',
+  'asunaprevir', 'daclatasvir', 'faldaprevir', 'alisporivir', 'miravirsen', 'metavir', 'heplisav', 'engerix', 'recombivax'
+];
 
 /**
- * Heuristic: find a likely drug name in transcript after a prescription-like trigger.
+ * Simple list-based drug detection. Looks for known drug names in the transcript.
  */
 function extractDrug(transcript: string): string | null {
-  if (!transcript || transcript.length < 4) return null;
+  if (!transcript || transcript.length < 3) return null;
   const lower = transcript.toLowerCase();
-  if (!TRIGGERS.test(lower)) return null;
-
-  const words = transcript.split(/\s+/);
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i].replace(/[^a-zA-Z]/g, '');
-    if (w.length < 3 || STOP.has(w.toLowerCase())) continue;
-    if (DRUG_SUFFIX.test(w)) return w;
-    // Capitalized (brand-style) or first word after "prescribe"/"recommend"
-    if (i > 0 && /^[A-Z]/.test(words[i])) return w;
+  
+  // Search for any known drug name in the transcript
+  for (const drug of COMMON_DRUGS) {
+    if (lower.includes(drug)) {
+      return drug.charAt(0).toUpperCase() + drug.slice(1); // Capitalize first letter
+    }
   }
-  // Fallback: first long alpha word after a trigger
-  const m = lower.match(/(?:prescrib|recommend|prescription|take|start|put you on|give you|adding)\s+(?:you\s+)?(?:some\s+)?(\w{4,})/i);
-  if (m && !STOP.has(m[1].toLowerCase())) return m[1];
+  
   return null;
 }
 
@@ -32,8 +45,8 @@ type Props = {
 };
 
 /**
- * STT via Web Speech API. Listens for prescription-like phrases and extracts drug names.
- * When detected, calls onPrescriptionDetected(drug). Runs alongside the LiveKit call (same mic).
+ * STT via Web Speech API. Listens to local microphone and detects drug names.
+ * When detected, calls onPrescriptionDetected(drug). Runs alongside the LiveKit call.
  */
 export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
   const [listening, setListening] = useState(false);
@@ -61,6 +74,7 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
         debounceRef.current = setTimeout(() => {
           lastDrugRef.current = null;
         }, 8000);
+        console.log('🔍 Medication detected:', drug, '| Full transcript:', t);
         onPrescriptionDetected(drug);
       }
     },
@@ -107,6 +121,13 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
       try { rec.stop?.(); } catch { /* ignore */ }
     }
   }, [listening, disabled]);
+
+  // Auto-start listening when component mounts
+  useEffect(() => {
+    if (!disabled) {
+      setListening(true);
+    }
+  }, [disabled]);
 
   return (
     <div className="stt-widget">

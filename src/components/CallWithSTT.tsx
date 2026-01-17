@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useRoomContext } from '@livekit/components-react';
 import { PrescriptionSTT } from './PrescriptionSTT';
 import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 
@@ -7,14 +8,44 @@ import { ConflictCheckIndicator } from './ConflictCheckIndicator';
  * calls /check-interactions (Browserbase or RxNav) and shows ConflictCheckIndicator.
  */
 export function CallWithSTT() {
+  const room = useRoomContext();
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
   const [currentDrug, setCurrentDrug] = useState<string | undefined>();
+  const [detectedDrug, setDetectedDrug] = useState<{ drug: string; timestamp: number } | null>(null);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
+    
+
+    //Check Against Patient History (Unimplemented)
+    console.log('💊 Checking interactions for:', drug);
     setCurrentDrug(drug);
     setIsChecking(true);
     setResult(null);
+    
+    // Show popup on local screen immediately
+    setDetectedDrug({ drug, timestamp: Date.now() });
+    setTimeout(() => setDetectedDrug(null), 3000);
+    
+    // Broadcast to all participants
+    if (room?.localParticipant) {
+      try {
+        console.log('📡 Broadcasting drug detection:', drug);
+        console.log('   Room:', room);
+        console.log('   LocalParticipant:', room.localParticipant);
+        
+        await room.localParticipant.publishData(
+          new TextEncoder().encode(JSON.stringify({ type: 'drug_detected', drug })),
+          { reliable: true }
+        );
+        console.log('📡 ✅ Broadcasted drug detection to all participants');
+      } catch (e) {
+        console.warn('❌ Failed to broadcast drug detection:', e);
+      }
+    } else {
+      console.warn('❌ No room or localParticipant available');
+    }
+    
     try {
       const res = await fetch('/check-interactions', {
         method: 'POST',
@@ -22,18 +53,87 @@ export function CallWithSTT() {
         body: JSON.stringify({ newDrug: drug }),
       });
       const data = await res.json();
+      console.log('✅ Interaction check result:', data);
       setResult(data);
     } catch {
+      console.log('❌ Interaction check failed');
       setResult({ hasConflict: false, details: 'Conflict check request failed.' });
     } finally {
       setIsChecking(false);
     }
-  }, []);
+  }, [room]);
+
+  // Listen for incoming drug detections
+  useEffect(() => {
+    if (!room) {
+      console.log('⚠️ No room available yet');
+      return;
+    }
+    console.log('📡 Setting up data_received listener on room:', room);
+    console.log('📡 Available room events:', Object.getOwnPropertyNames(room).filter(n => n.includes('on') || n.includes('add')).slice(0, 20));
+    
+    const handleData = (payload: Uint8Array, participant?: any) => {
+      try {
+        console.log('📡 RAW DATA RECEIVED!', payload, 'from participant:', participant);
+        const message = JSON.parse(new TextDecoder().decode(payload));
+        console.log('📡 Parsed message:', message);
+        
+        if (message.type === 'drug_detected') {
+          console.log('📡 ✅ Received drug detection from other participant:', message.drug);
+          setDetectedDrug({ drug: message.drug, timestamp: Date.now() });
+          setTimeout(() => setDetectedDrug(null), 3000);
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to parse incoming data:', e);
+      }
+    };
+    
+    // Try multiple event names
+    room.on('data_received', handleData);
+    console.log('📡 Attached listener to: data_received');
+    
+    return () => {
+      console.log('📡 Cleaning up data_received listener');
+      room.off('data_received', handleData);
+    };
+  }, [room]);
 
   return (
     <>
       <PrescriptionSTT onPrescriptionDetected={onPrescriptionDetected} />
+      {detectedDrug && (
+        <div className="drug-popup">
+          💊 Medication detected: <strong>{detectedDrug.drug}</strong>
+        </div>
+      )}
       <ConflictCheckIndicator isChecking={isChecking} result={result} drug={currentDrug} />
+      <style>{`
+        .drug-popup {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          background: rgba(0, 200, 100, 0.95);
+          color: white;
+          padding: 16px 24px;
+          border-radius: 12px;
+          font-weight: bold;
+          z-index: 9999;
+          box-shadow: 0 8px 24px rgba(0, 200, 100, 0.4);
+          font-size: 14px;
+          animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          border-left: 4px solid rgba(255, 255, 255, 0.3);
+        }
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(400px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </>
   );
 }
