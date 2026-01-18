@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { useSession } from '../contexts/SessionContext';
-import { useRoleContext } from '../App';
+import { useRoleContext } from '../contexts/RoleContext';
 
 /**
  * Manages visit session lifecycle:
@@ -13,16 +13,17 @@ export function VisitManager() {
   const session = useSession();
   const role = useRoleContext();
 
-  // Start visit when room connects
+  // Start visit when room connects (only once)
+  const startedRef = useRef(false);
   useEffect(() => {
-    if (!room || !role) return;
+    if (!room || !role || startedRef.current) return;
 
     const handleConnected = () => {
+      if (startedRef.current) return;
+      startedRef.current = true;
       const sessionId = `visit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const participantIdentity = room.localParticipant?.identity;
-      
       session.startVisit(sessionId, role, participantIdentity);
-      console.log(`[VisitManager] Visit started: ${sessionId} (${role})`);
     };
 
     if (room.state === 'connected') {
@@ -33,7 +34,7 @@ export function VisitManager() {
         room.off('connected', handleConnected);
       };
     }
-  }, [room, role, session]);
+  }, [room, role]);
 
   // End visit when disconnected
   useEffect(() => {
@@ -43,10 +44,6 @@ export function VisitManager() {
       const visitData = session.endVisit();
       
       if (visitData) {
-        console.log(`[VisitManager] Visit ended: ${visitData.sessionId}`);
-        console.log(`[VisitManager] Prescriptions: ${visitData.prescriptions.length}`);
-        console.log(`[VisitManager] Confusion events: ${visitData.confusionEvents.length}`);
-        
         // Trigger post-visit safety check
         triggerPostVisitSafetyCheck(visitData);
       }
@@ -63,7 +60,6 @@ export function VisitManager() {
 
 async function triggerPostVisitSafetyCheck(visitData: any) {
   try {
-    console.log('[VisitManager] Triggering post-visit safety check...');
     
     const response = await fetch('/post-visit-safety-check', {
       method: 'POST',
@@ -85,7 +81,6 @@ async function triggerPostVisitSafetyCheck(visitData: any) {
     }
 
     const result = await response.json();
-    console.log('[VisitManager] Post-visit safety check complete:', result);
     
     // Store session ID for patient to access summary later
     if (visitData.role === 'patient' && result.sessionId) {

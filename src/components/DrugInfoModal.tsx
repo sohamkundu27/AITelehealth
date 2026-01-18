@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDrugInfo, summarizeToPopupFormat, type PopupData } from '../../openFDA';
+import { getDrugInfo, summarizeToPopupFormat, getPatientHistory, evaluateDrugSafety, type PopupData, type SafetyResult } from '../../openFDA';
 import './styles/DrugInfoModal.css';
 
 interface DrugInfoModalProps {
@@ -13,6 +13,7 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [internalExiting, setInternalExiting] = useState(false);
+  const [safety, setSafety] = useState<SafetyResult | null>(null);
 
   const overlayStyle = { pointerEvents: 'none' as const };
   const modalStyle = {
@@ -36,6 +37,10 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
         const drugInfo = await getDrugInfo(drug);
         const summary = await summarizeToPopupFormat(drugInfo);
         setPopupData(summary);
+        // Fetch patient history and evaluate safety
+        const patient = await getPatientHistory();
+        const safetyRes = await evaluateDrugSafety(drug, drugInfo, patient);
+        setSafety(safetyRes);
       } catch (err) {
         console.error('Failed to fetch drug info:', err);
         setError('Failed to load drug information');
@@ -91,6 +96,11 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
               <p className="drug-modal-generic">{popupData.generic_name}</p>
             )}
           </div>
+          {safety && (
+            <div className={`safety-badge ${safety.decision === 'unsafe' ? 'unsafe' : (safety.decision === 'safe' ? 'safe' : '')}`} title={safety.rationale}>
+              {safety.decision === 'unsafe' ? 'Unsafe' : (safety.decision === 'safe' ? 'Safe' : 'Review')}
+            </div>
+          )}
           <button className="drug-modal-close" onClick={handleClose}>✕</button>
         </div>
 
@@ -160,9 +170,24 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
             </div>
           </div>
 
+          {safety && (
+            <div className="safety-debug">
+              <h3 className="drug-section-title">Safety Analysis</h3>
+              <div className="drug-info-row"><span className="drug-info-value"><strong>Decision:</strong> {safety.decision} ({Math.round(safety.confidence * 100)}%)</span></div>
+              <div className="drug-info-row"><span className="drug-info-value"><strong>Source:</strong> {safety.source || 'unknown'}</span></div>
+              <div className="drug-info-row"><span className="drug-info-value"><strong>Rationale:</strong> {safety.rationale}</span></div>
+              {safety.patientDrugs && safety.patientDrugs.length > 0 && (
+                <div className="drug-info-row"><span className="drug-info-value"><strong>Patient meds:</strong> {safety.patientDrugs.join(', ')}</span></div>
+              )}
+              {safety.rxnavDetails && (
+                <div className="drug-info-row"><span className="drug-info-value"><strong>RxNav:</strong> {safety.rxnavDetails}</span></div>
+              )}
+            </div>
+          )}
+
           <div className="drug-modal-footer">
             <p className="drug-modal-disclaimer">
-              This information is from the FDA database and should not replace professional medical advice.
+              Safety uses FDA labeling + ML judgment. Verify with a clinician.
             </p>
           </div>
         </div>

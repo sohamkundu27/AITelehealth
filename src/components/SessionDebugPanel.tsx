@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSession } from '../contexts/SessionContext';
-import { useRoleContext } from '../App';
+import { useRoleContext } from '../contexts/RoleContext';
 
 /**
  * Debug panel to help test Phase 1 implementation.

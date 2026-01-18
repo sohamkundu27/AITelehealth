@@ -3,7 +3,10 @@ import multer from 'multer';
 import { AccessToken } from 'livekit-server-sdk';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { getDocumentProxy, extractText } from 'unpdf';
+import { createRequire } from 'module';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { generateClinicianNote, generatePatientFollowUp } from './server/utils/messageGenerator.js';
 
 dotenv.config({ path: '.env.local' });
@@ -188,11 +191,33 @@ app.post('/upload-pdf', upload.single('pdf'), async (req, res) => {
     if (buf.length < 5 || !buf.subarray(0, 5).toString('ascii').startsWith('%PDF-')) {
       return res.status(400).json({ error: 'File does not look like a valid PDF' });
     }
-    const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const { text } = await extractText(pdf, { mergePages: true });
-    const drugs = extractDrugsFromText(text || '');
-    storedPdf = { text: (text || '').slice(0, 50000), drugs };
-    res.json({ ok: true, drugCount: drugs.length, drugs });
+
+    // Write buffer to a temp file for pdf-text-extract
+    const tmpDir = os.tmpdir();
+    const tmpPath = path.join(tmpDir, `nexhacks-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`);
+    await fs.promises.writeFile(tmpPath, buf);
+
+    // Use CommonJS require for pdf-text-extract
+    const require = createRequire(import.meta.url);
+    const extract = require('pdf-text-extract');
+
+    extract(tmpPath, { splitPages: true }, (err, pages) => {
+      // Clean up temp file regardless of success
+      fs.promises.unlink(tmpPath).catch(() => {});
+
+      if (err) {
+        console.error('PDF upload error:', err);
+        const msg = isPdfReadError(err)
+          ? "This PDF could not be read. It may be corrupted, password-protected, or in a format we don't support. Try a different file or re-save the PDF."
+          : 'Failed to parse PDF';
+        return res.status(500).json({ error: msg });
+      }
+
+      const text = Array.isArray(pages) ? pages.join('\n\n') : String(pages || '');
+      const drugs = extractDrugsFromText(text || '');
+      storedPdf = { text: (text || '').slice(0, 50000), drugs };
+      return res.json({ ok: true, drugCount: drugs.length, drugs, text: storedPdf.text });
+    });
   } catch (err) {
     console.error('PDF upload error:', err);
     const msg = isPdfReadError(err)
@@ -221,13 +246,21 @@ app.post('/check-interactions', async (req, res) => {
     let result = await checkInteractionsBrowserbase(newDrug, existingDrugs);
     if (!result) result = await checkInteractionsRxNav(newDrug, existingDrugs);
 
-    res.json(result);
+    res.json({
+      ...result,
+      checked: {
+        newDrug,
+        existingDrugs,
+        count: existingDrugs.length,
+      },
+    });
   } catch (err) {
     console.error('check-interactions error:', err);
     res.status(500).json({
       hasConflict: false,
       details: 'Conflict check failed. Please verify manually.',
       source: 'error',
+      error: String(err?.message || err),
     });
   }
 });
@@ -287,7 +320,6 @@ app.post('/post-visit-safety-check', async (req, res) => {
     if (aceInhibitors.length > 0 && nsaids.length > 0) {
       safetyCheck.risks.push({
         type: 'renal_risk',
-        severity: 'moderate',
         description: 'ACE inhibitor + NSAID combination may increase renal risk',
         drugs: [aceInhibitors[0].drug, nsaids[0].drug],
       });

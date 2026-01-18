@@ -40,6 +40,19 @@ export function PdfUpload({ onReady, onDrugCount }: Props) {
         const n = data?.drugCount ?? 0;
         setDrugCount(n);
         onDrugCount?.(n);
+        // Store patient drugs locally for client-side safety checks
+        try {
+          const drugs = Array.isArray(data?.drugs) ? data.drugs : [];
+          localStorage.setItem('nexhacks.patientDrugs', JSON.stringify(drugs));
+        } catch {}
+        // Print full extracted text contents to the console (doctor-side use case)
+        if (typeof data?.text === 'string') {
+          console.log('=== FULL EXTRACTED PDF TEXT START ===');
+          console.log(data.text);
+          console.log('=== FULL EXTRACTED PDF TEXT END ===');
+        } else {
+          console.warn('No extracted text returned from server for this PDF.');
+        }
       } catch {
         setStatus('error');
         setError('Upload failed. Start the backend with: node server.js');

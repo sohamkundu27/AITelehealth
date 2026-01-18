@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../contexts/SessionContext';
 import { getDrugExplanation, generateFallbackExplanation, type DrugExplanation } from '../utils/drugExplanations';
-import { useRoleContext } from '../App';
+import { useRoleContext } from '../contexts/RoleContext';
 
 interface PanelProps {
   drug: string;

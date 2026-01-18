@@ -1,45 +1,35 @@
 import { LiveKitRoom, VideoConference, RoomAudioRenderer } from '@livekit/components-react';
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState } from 'react';
 import { PdfUpload } from './components/PdfUpload';
 import { CallWithSTT } from './components/CallWithSTT';
 import { OvershootDemo } from './components/OvershootDemo';
 import { PatientClarificationPanelContainer } from './components/PatientClarificationPanel';
-import { SessionDebugPanel } from './components/SessionDebugPanel';
 import { VisitManager } from './components/VisitManager';
 import { VisitSummary } from './pages/VisitSummary';
-import { useRole, type UserRole } from './hooks/useRole';
+import { useRole } from './hooks/useRole';
 import { SessionProvider } from './contexts/SessionContext';
 import '@livekit/components-styles';
 import './App.css';
-
-// Role context for components to access
-const RoleContext = createContext<UserRole>(null);
-
-export const useRoleContext = () => useContext(RoleContext);
+import { RoleContext } from './contexts/RoleContext';
 
 /**
- * Flow: 1) Upload medical PDF → 2) Start call (LiveKit) → 3) STT detects prescriptions
- * → 4) Conflict check (Browserbase or RxNav) with on-screen indicator.
- * → 5) Post-visit safety check and summary
+ * Flow: 
+ * Patient: Click "Enter Meeting" → Join call
+ * Doctor: Upload patient medical PDF → Join call
  */
 function App() {
   const [pdfReady, setPdfReady] = useState(false);
   const [token, setToken] = useState('');
   const role = useRole();
 
-  // Check if we're on the visit summary page
+  // Detect visit summary route, but keep hooks unconditionally called
   const path = window.location.pathname;
   const hash = window.location.hash;
-  if (path.startsWith('/visit-summary/')) {
-    const sessionId = path.split('/visit-summary/')[1];
-    return <VisitSummary sessionId={sessionId} />;
-  }
-  if (hash.startsWith('#/visit-summary/')) {
-    const sessionId = hash.split('#/visit-summary/')[1];
-    return <VisitSummary sessionId={sessionId} />;
-  }
+  const summarySessionId = path.startsWith('/visit-summary/')
+    ? path.split('/visit-summary/')[1]
+    : (hash.startsWith('#/visit-summary/') ? hash.split('#/visit-summary/')[1] : null);
 
-  // Fetch LiveKit token only after user has uploaded PDF and clicked "Start call"
+  // Fetch LiveKit token once ready
   useEffect(() => {
     if (!pdfReady) return;
     (async () => {
@@ -54,8 +44,39 @@ function App() {
     })();
   }, [pdfReady, role]);
 
-  // Step 1: PDF upload
+  // Render visit summary when routed
+  if (summarySessionId) {
+    return <VisitSummary sessionId={summarySessionId} />;
+  }
+
+  // Step 1: Patient sees "Enter Meeting", Doctor uploads PDF
   if (!pdfReady) {
+    if (role === 'patient') {
+      return (
+        <div className="app-step app-upload">
+          <div style={{ maxWidth: '420px', margin: '0 auto', textAlign: 'center', padding: '24px' }}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '16px', color: '#fff' }}>Ready to join?</h2>
+            <button
+              onClick={() => setPdfReady(true)}
+              style={{
+                background: '#0a0',
+                color: '#fff',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '24px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '16px',
+              }}
+            >
+              Enter Meeting
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    // Doctor uploads patient medical history
     return (
       <div className="app-step app-upload">
         <PdfUpload onReady={() => setPdfReady(true)} />
@@ -90,7 +111,6 @@ function App() {
         <CallWithSTT />
         <OvershootDemo />
         <PatientClarificationPanelContainer />
-        <SessionDebugPanel />
         {/* VideoConference handles the layout; grid shows participants. */}
         <VideoConference />
         {/* Essential for audio playback */}

@@ -72,16 +72,15 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
                 confidence,
               });
               
-              console.log(`[Overshoot] ${parsed.current_state} detected (confidence: ${confidence})`, parsed);
+              // Removed overshoot detection console log
             }
           } catch (e) {
             // If parsing fails, just display the raw result
-            console.warn('Failed to parse Overshoot result:', e);
+            // Removed overshoot parsing warning
           }
         }
       },
       onError: (err: any) => {
-        console.error("Overshoot error:", err);
         setError(err.message || "Unknown error");
         setIsRunning(false);
       }
@@ -134,7 +133,6 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
             }, 8000);
         }
       } catch (err: any) {
-        console.error("Failed to start Overshoot:", err);
         setError("Camera failed. Switching to Demo Mode in 3s...");
         setTimeout(() => startDemoMode(), 3000);
       }
@@ -186,7 +184,7 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
             confidence,
           });
         } catch (e) {
-          console.warn('Demo mode parse error:', e);
+          // Removed demo mode parse warning
         }
         
         index++;

@@ -59,6 +59,27 @@
   background: transparent;
 }
 
+.safety-badge {
+  align-self: center;
+  margin-right: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.safety-badge.safe {
+  background: rgba(0, 180, 90, 0.25);
+  border-color: rgba(0, 180, 90, 0.6);
+}
+.safety-badge.unsafe {
+  background: rgba(255, 80, 80, 0.25);
+  border-color: rgba(255, 80, 80, 0.7);
+}
+
 .drug-modal-title h2 {
   margin: 0;
   font-size: 18px;
@@ -103,6 +124,14 @@
   overflow-y: auto;
   flex: 1;
   padding: 24px;
+}
+
+.safety-debug {
+  margin: 16px 0 0 0;
+  padding: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .drug-modal-content::-webkit-scrollbar {

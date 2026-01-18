@@ -1,5 +1,7 @@
 // Optional HuggingFace import - lazy loaded only when needed
-async function getHfInstance() {
+import type { HfInference } from '@huggingface/inference';
+
+async function getHfInstance(): Promise<HfInference | null> {
   try {
     const { HfInference } = await import("@huggingface/inference");
     const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
@@ -7,7 +9,7 @@ async function getHfInstance() {
       return new HfInference(apiKey);
     }
   } catch (e) {
-    console.warn('HuggingFace inference not available - will use raw data without summarization');
+    console.warn('HuggingFace inference not available - will use raw data without summarization', e);
   }
   return null;
 }
@@ -42,6 +44,25 @@ export interface PopupData {
   contraindications: string[];
   interactions: string[];
 }
+
+export interface PatientHistory {
+  drugs: string[];
+  text?: string;
+}
+
+export interface SafetyResult {
+  decision: 'safe' | 'unsafe' | 'unknown';
+  confidence: number;
+  rationale: string;
+  source?: 'rxnav' | 'hf' | 'heuristic' | 'unknown';
+  rxnavDetails?: string;
+  patientDrugs?: string[];
+}
+
+// Few-shot style known unsafe combinations
+const KNOWN_UNSAFE_PAIRS: Array<{ a: string; b: string; reason: string }> = [
+  { a: 'sertraline', b: 'albuterol', reason: 'Known adverse combination per internal rule: Sertraline + Albuterol' },
+];
 
 interface OpenFDAResponse {
   results: Array<{
@@ -152,7 +173,7 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
     const condenseText = async (text: string, maxLength: number = 200): Promise<string> => {
       if (text.length <= maxLength) return text;
       const hfInstance = await getHfInstance();
-      if (!hfInstance) {
+      if (!hfInstance?.summarization) {
         // Fallback: just truncate if HuggingFace not available
         return text.substring(0, maxLength) + "...";
       }
@@ -185,7 +206,7 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
       const combined = validTexts.join(" ").substring(0, 2000);
       
       const hfInstance = await getHfInstance();
-      if (!hfInstance) {
+      if (!hfInstance?.summarization) {
         // Fallback: return first few valid texts if HuggingFace not available
         return validTexts.slice(0, maxItems).map(t => t.substring(0, 200));
       }
@@ -198,21 +219,21 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
         });
         
         // Split the summary into bullet points with improved logic
-        let bullets = result.summary_text
+        const bullets = result.summary_text
           // Split on sentence boundaries (. ! ? followed by space or newline)
           .split(/(?<=[.!?])\s+(?=[A-Z])/g)
           // Also split on newlines and semicolons
-          .flatMap(sentence => sentence.split(/[;\n]/))
-          .map(s => s.trim())
+          .flatMap((sentence: string) => sentence.split(/[;\n]/))
+          .map((s: string) => s.trim())
           // Remove duplicates and empty strings
-          .filter((s, index, array) => 
+          .filter((s: string, index: number, array: string[]) => 
             s.length > 15 && 
             s.length < 250 &&
             !s.match(/^[\s\-•*]+$/) && // Skip pure bullet/dash lines
             array.indexOf(s) === index // Skip duplicates
           )
           // Clean up text
-          .map(s => {
+          .map((s: string) => {
             // Remove leading/trailing punctuation and bullets
             s = s.replace(/^[\s\-•*:]+|[\s\-•*:]+$/g, '').trim();
             // Capitalize first letter only if not already capitalized
@@ -222,7 +243,7 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
             return s;
           })
           // Remove any remaining empty strings
-          .filter(s => s.length > 15)
+          .filter((s: string) => s.length > 15)
           .slice(0, maxItems);
         
         return bullets.length > 0 ? bullets : [];
@@ -266,5 +287,120 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
       contraindications: drugData.contraindications,
       interactions: drugData.interactions,
     };
+  }
+}
+
+/**
+ * Retrieves patient medical records (drug list) from backend.
+ */
+export async function getPatientHistory(): Promise<PatientHistory> {
+  try {
+    const raw = localStorage.getItem('nexhacks.patientDrugs');
+    const drugs = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(drugs)) {
+      return { drugs, text: '' };
+    }
+    return { drugs: [], text: '' };
+  } catch (e) {
+    console.warn('Could not retrieve patient history from localStorage:', e);
+    return { drugs: [], text: '' };
+  }
+}
+
+/**
+ * Uses HuggingFace zero-shot classification to judge safety of a drug for a given patient.
+ * Falls back to heuristic matching when HF is not available.
+ */
+export async function evaluateDrugSafety(drugName: string, drugData: DrugData, patient: PatientHistory): Promise<SafetyResult> {
+  try {
+    // 0) Few-shot override: known unsafe pairs
+    const dn = String(drugName || '').toLowerCase();
+    const patientSet = new Set((patient.drugs || []).map(d => String(d).toLowerCase()));
+    for (const pair of KNOWN_UNSAFE_PAIRS) {
+      const hasPair = (dn === pair.a && patientSet.has(pair.b)) || (dn === pair.b && patientSet.has(pair.a));
+      if (hasPair) {
+        return {
+          decision: 'unsafe',
+          confidence: 0.95,
+          rationale: pair.reason,
+          source: 'heuristic',
+          patientDrugs: patient.drugs || [],
+        };
+      }
+    }
+    // Try HuggingFace zero-shot classification if available
+    const hf = await getHfInstance();
+
+    const contextParts = [
+      `Patient current medications: ${patient.drugs.join(', ') || 'None listed'}.`,
+      `Drug name: ${drugName}. Generic: ${drugData.generic_name}. Route: ${drugData.route.join(', ') || 'N/A'}.`,
+      `Indications: ${(drugData.indications || []).join(' ') || 'N/A'}.`,
+      `Warnings: ${(drugData.warnings || []).join(' ') || 'N/A'}.`,
+      `Contraindications: ${(drugData.contraindications || []).join(' ') || 'N/A'}.`,
+      `Known interactions: ${(drugData.interactions || []).join(' ') || 'N/A'}.`,
+      `Examples (few-shot): Sertraline + Albuterol → unsafe; Ibuprofen + Lisinopril → unsafe; Acetaminophen + Amoxicillin → safe.`,
+    ];
+    const input = contextParts.join('\n');
+
+    if (hf?.zeroShotClassification) {
+      try {
+        const result = await hf.zeroShotClassification({
+          model: 'facebook/bart-large-mnli',
+          inputs: input,
+          parameters: {
+            candidate_labels: ['safe', 'unsafe'],
+            multi_label: false,
+          },
+        });
+
+        const raw = result as unknown as { labels: string[]; scores: number[] };
+        const scores = Array.isArray(raw?.labels) && Array.isArray(raw?.scores)
+          ? raw.labels.reduce((acc: Record<string, number>, label: string, idx: number) => {
+              acc[label] = raw.scores[idx];
+              return acc;
+            }, {})
+          : {};
+
+        const unsafeScore = scores['unsafe'] ?? 0;
+        const safeScore = scores['safe'] ?? 0;
+        const decision = unsafeScore > safeScore ? 'unsafe' : 'safe';
+        const confidence = Math.max(unsafeScore, safeScore);
+        const rationale = `Model scores — safe: ${safeScore.toFixed(2)}, unsafe: ${unsafeScore.toFixed(2)}.`;
+        return { decision, confidence, rationale, source: 'hf', patientDrugs: patient.drugs || [] };
+      } catch (e) {
+        console.warn('HuggingFace safety classification failed, falling back:', e);
+      }
+    }
+
+    // Fallback heuristic: if any patient drug name occurs in interactions/warnings, mark unsafe
+    const combined = [
+      ...(drugData.interactions || []),
+      ...(drugData.warnings || []),
+      ...(drugData.contraindications || []),
+    ].join(' ').toLowerCase();
+    let hit = '';
+    for (const d of patient.drugs || []) {
+      const name = String(d).toLowerCase();
+      if (name && combined.includes(name)) { hit = d; break; }
+    }
+    if (hit) {
+      return {
+        decision: 'unsafe',
+        confidence: 0.65,
+        rationale: `Heuristic: Found patient drug "${hit}" in contraindications/interactions/warnings.`,
+        source: 'heuristic',
+        patientDrugs: patient.drugs || [],
+      };
+    }
+    return {
+      decision: 'safe',
+      confidence: 0.55,
+      rationale: 'Heuristic: No obvious conflicts found in labeling data.',
+      source: 'heuristic',
+      patientDrugs: patient.drugs || [],
+    };
+  } catch (e) {
+    console.warn('evaluateDrugSafety error:', e);
+    return { decision: 'unknown', confidence: 0.0, rationale: 'Safety check unavailable.', source: 'unknown', patientDrugs: patient.drugs || [] };
   }
 }

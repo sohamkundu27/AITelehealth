@@ -2,24 +2,19 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent, type RemoteParticipant } from 'livekit-client';
 import { PrescriptionSTT } from './PrescriptionSTT';
-import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 import { DrugInfoModal } from './DrugInfoModal';
 import { useSession } from '../contexts/SessionContext';
 
 /**
- * In-call layer: runs PrescriptionSTT and, when a drug is detected,
- * calls /check-interactions (Browserbase or RxNav) and shows ConflictCheckIndicator.
+ * In-call layer: runs PrescriptionSTT and detects drugs prescribed during the call.
  */
 export function CallWithSTT() {
   const room = useRoomContext();
   const session = useSession();
-  const [isChecking, setIsChecking] = useState(false);
-  const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
   const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
-    // Check Against Patient History (Unimplemented)
-    console.log('💊 Checking interactions for:', drug);
+    console.log('💊 Drug detected:', drug);
     
     // Track drug mention in session (for linking with confusion events)
     session.addDrugMention(drug);
@@ -33,10 +28,8 @@ export function CallWithSTT() {
     
     // Add drug to active list if not already present
     setActiveDrugs((prev) => (prev.includes(drug) ? prev : [...prev, drug]));
-    setIsChecking(true);
-    setResult(null);
 
-    // Broadcast to all participants so the popup shows up for everyone
+    // Broadcast to all participants
     if (room?.localParticipant) {
       try {
         const payload = {
@@ -53,22 +46,6 @@ export function CallWithSTT() {
       } catch (e) {
         console.warn('❌ Failed to broadcast drug detection:', e);
       }
-    }
-
-    try {
-      const res = await fetch('/check-interactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newDrug: drug }),
-      });
-      const data = await res.json();
-      console.log('✅ Interaction check result:', data);
-      setResult(data);
-    } catch {
-      console.log('❌ Interaction check failed');
-      setResult({ hasConflict: false, details: 'Conflict check request failed.' });
-    } finally {
-      setIsChecking(false);
     }
   }, [room, session]);
 
@@ -111,7 +88,6 @@ export function CallWithSTT() {
           />
         ))}
       </div>
-      <ConflictCheckIndicator isChecking={isChecking} result={result} drug={activeDrugs[0]} />
     </>
   );
 }
