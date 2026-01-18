@@ -86,6 +86,7 @@ export function MonitoringPanel({ onPrescriptionDetected }: Props) {
           padding: 12px 16px;
           border-bottom: 1px solid var(--border-color);
           background: var(--bg-hover);
+          gap: 8px;
         }
 
         .monitoring-title {
@@ -93,6 +94,8 @@ export function MonitoringPanel({ onPrescriptionDetected }: Props) {
           font-size: 14px;
           font-weight: 600;
           color: var(--text-primary);
+          flex: 1;
+          min-width: 0;
         }
 
         .monitoring-collapse-btn {

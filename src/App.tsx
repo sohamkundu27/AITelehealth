@@ -5,9 +5,7 @@ import { CallWithSTT } from './components/CallWithSTT';
 import { LandingPage } from './components/LandingPage';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
-import { OvershootDemo } from './components/OvershootDemo';
 import { PatientClarificationPanelContainer } from './components/PatientClarificationPanel';
-import { SessionDebugPanel } from './components/SessionDebugPanel';
 import { VisitManager } from './components/VisitManager';
 import { VisitSummary } from './pages/VisitSummary';
 import { useRole, type UserRole } from './hooks/useRole';
@@ -111,9 +109,7 @@ function App() {
           >
             <VisitManager />
             <CallWithSTT />
-            <OvershootDemo />
             <PatientClarificationPanelContainer />
-            <SessionDebugPanel />
             {/* VideoConference handles the layout; grid shows participants. */}
             <VideoConference layout="grid" />
             {/* Essential for audio playback */}

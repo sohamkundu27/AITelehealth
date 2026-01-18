@@ -130,6 +130,58 @@ video {
   transition: all 0.3s ease !important;
 }
 
+/* Theme-aware LiveKit button styles */
+.lk-button,
+.lk-button-group button,
+.lk-control-bar button {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  transition: all 0.2s ease !important;
+}
+
+.lk-button:hover,
+.lk-button-group button:hover,
+.lk-control-bar button:hover {
+  background: var(--bg-overlay) !important;
+  border-color: var(--border-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.lk-button:active,
+.lk-button-group button:active,
+.lk-control-bar button:active {
+  background: var(--bg-hover) !important;
+  transform: scale(0.95) !important;
+}
+
+/* LiveKit button text and icons */
+.lk-button span,
+.lk-button-group button span,
+.lk-control-bar button span {
+  color: var(--text-primary) !important;
+}
+
+.lk-button svg,
+.lk-button-group button svg,
+.lk-control-bar button svg {
+  fill: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Dropdown menus */
+.lk-button-menu,
+.lk-button-menu-item {
+  background: var(--bg-overlay) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.lk-button-menu-item:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
 @media (max-width: 768px) {
   .lk-control-bar {
     bottom: 10px !important;

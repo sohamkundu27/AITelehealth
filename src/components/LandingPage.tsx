@@ -252,7 +252,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           padding: 1.25rem 2.5rem;
           font-size: 1.125rem;
           font-weight: 600;
-          color: #000;
+          color: var(--bg-primary);
           background: var(--accent-primary);
           border: none;
           border-radius: 12px;
@@ -365,9 +365,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         .feature-card {
           position: relative;
           padding: 2.5rem 2rem;
-          background: rgba(18, 18, 24, 0.6);
+          background: var(--bg-overlay);
           backdrop-filter: blur(14px) saturate(140%);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--border-color);
           border-radius: 20px;
           transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
           opacity: 0;
@@ -518,7 +518,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           padding: 1.25rem 2.5rem;
           font-size: 1.125rem;
           font-weight: 600;
-          color: #000;
+          color: var(--bg-primary);
           background: var(--accent-primary);
           border: none;
           border-radius: 12px;
@@ -773,21 +773,19 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
         /* Light Theme Adjustments */
         [data-theme="light"] .feature-card {
-          background: rgba(255, 255, 255, 0.8);
-          border: 1px solid rgba(0, 102, 204, 0.2);
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid var(--border-color);
         }
 
         [data-theme="light"] .feature-card:hover {
           border-color: var(--accent-primary);
-          box-shadow: 0 12px 48px rgba(0, 102, 204, 0.2);
+          box-shadow: 0 12px 48px rgba(0, 102, 204, 0.15);
+          background: var(--bg-overlay);
         }
 
-        [data-theme="light"] .hero-cta {
-          color: #fff;
-        }
-
+        [data-theme="light"] .hero-cta,
         [data-theme="light"] .cta-final-button {
-          color: #fff;
+          color: #ffffff;
         }
       `}</style>
     </>
