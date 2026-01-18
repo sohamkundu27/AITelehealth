@@ -376,6 +376,86 @@ app.get('/visit-summary/:sessionId', async (req, res) => {
 // ============================================================================
 
 /**
+ * Analyze patient comprehension using Gemini.
+ * Takes a hardcoded body language observation and returns CONFUSION or UNDERSTANDING.
+ */
+app.post('/api/analyze-comprehension', async (req, res) => {
+  try {
+    const { observation } = req.body;
+    const bodyLanguage = observation || 'attentive, nodding';
+    
+    const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      // No API key - return random result for demo
+      console.log('[Comprehension] No Gemini API key, using random result');
+      const isConfused = Math.random() < 0.25; // 25% chance of confusion
+      return res.json({
+        state: isConfused ? 'CONFUSION' : 'UNDERSTANDING',
+        evidence: bodyLanguage,
+        confidence: 'MEDIUM',
+        source: 'demo'
+      });
+    }
+    
+    console.log('[Comprehension] Analyzing with Gemini:', bodyLanguage);
+    
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const prompt = `You are analyzing a patient's body language during a telehealth call to determine if they understand what the doctor is explaining.
+
+Current observation: "${bodyLanguage}"
+
+Based on this observation, classify the patient's comprehension state.
+
+Rules:
+- "nodding", "attentive", "focused", "eye contact" = UNDERSTANDING
+- "head tilt", "squinting", "furrowed brow", "pursed lips", "confused look" = CONFUSION
+- "thinking" or "processing" = UNDERSTANDING (not confusion)
+
+Respond with ONLY a JSON object in this exact format:
+{"state": "UNDERSTANDING" or "CONFUSION", "confidence": "LOW" or "MEDIUM" or "HIGH"}`;
+    
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    
+    // Parse the JSON response
+    let parsed;
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found');
+      }
+    } catch (e) {
+      console.warn('[Comprehension] Failed to parse Gemini response:', text);
+      // Default to understanding if parsing fails
+      parsed = { state: 'UNDERSTANDING', confidence: 'LOW' };
+    }
+    
+    console.log('[Comprehension] Result:', parsed);
+    
+    res.json({
+      state: parsed.state || 'UNDERSTANDING',
+      evidence: bodyLanguage,
+      confidence: parsed.confidence || 'MEDIUM',
+      source: 'gemini'
+    });
+  } catch (err) {
+    console.error('[Comprehension] Error:', err);
+    res.status(500).json({ 
+      error: 'Comprehension analysis failed',
+      state: 'UNDERSTANDING',
+      evidence: 'error fallback',
+      confidence: 'LOW'
+    });
+  }
+});
+
+/**
  * Analyze a video frame for physical symptoms.
  * Placeholder endpoint - you can integrate with a vision AI later.
  * For now, returns random demo symptom detections.
