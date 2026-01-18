@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRoomContext } from '@livekit/components-react';
+import { RoomEvent, type RemoteParticipant } from 'livekit-client';
 import { PrescriptionSTT } from './PrescriptionSTT';
 import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 import { DrugInfoModal } from './DrugInfoModal';
@@ -15,34 +16,32 @@ export function CallWithSTT() {
   const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
-    
-
-    //Check Against Patient History (Unimplemented)
+    // Check Against Patient History (Unimplemented)
     console.log('💊 Checking interactions for:', drug);
     // Add drug to active list if not already present
-    setActiveDrugs(prev => prev.includes(drug) ? prev : [...prev, drug]);
+    setActiveDrugs((prev) => (prev.includes(drug) ? prev : [...prev, drug]));
     setIsChecking(true);
     setResult(null);
-    
-    // Broadcast to all participants
+
+    // Broadcast to all participants so the popup shows up for everyone
     if (room?.localParticipant) {
       try {
-        console.log('📡 Broadcasting drug detection:', drug);
-        console.log('   Room:', room);
-        console.log('   LocalParticipant:', room.localParticipant);
-        
-        await room.localParticipant.publishData(
-          new TextEncoder().encode(JSON.stringify({ type: 'drug_detected', drug })),
-          { reliable: true }
-        );
-        console.log('📡 ✅ Broadcasted drug detection to all participants');
+        const payload = {
+          type: 'drug_detected',
+          drug,
+          by: room.localParticipant.identity,
+          id: typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          ts: Date.now(),
+        };
+        await room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(payload)), {
+          reliable: true,
+        });
+        console.log('📡 Broadcasted drug detection to room:', payload);
       } catch (e) {
         console.warn('❌ Failed to broadcast drug detection:', e);
       }
-    } else {
-      console.warn('❌ No room or localParticipant available');
     }
-    
+
     try {
       const res = await fetch('/check-interactions', {
         method: 'POST',
@@ -62,35 +61,23 @@ export function CallWithSTT() {
 
   // Listen for incoming drug detections
   useEffect(() => {
-    if (!room) {
-      console.log('⚠️ No room available yet');
-      return;
-    }
-    console.log('📡 Setting up data_received listener on room:', room);
-    console.log('📡 Available room events:', Object.getOwnPropertyNames(room).filter(n => n.includes('on') || n.includes('add')).slice(0, 20));
-    
-    const handleData = (payload: Uint8Array, participant?: any) => {
+    if (!room) return;
+
+    const handleData = (payload: Uint8Array, participant?: RemoteParticipant) => {
       try {
-        console.log('📡 RAW DATA RECEIVED!', payload, 'from participant:', participant);
         const message = JSON.parse(new TextDecoder().decode(payload));
-        console.log('📡 Parsed message:', message);
-        
-        if (message.type === 'drug_detected') {
-          console.log('📡 ✅ Received drug detection from other participant:', message.drug);
-          setActiveDrugs(prev => prev.includes(message.drug) ? prev : [...prev, message.drug]);
-        }
+        if (message?.type !== 'drug_detected') return;
+        // LiveKit does not echo to the sender, but guard anyway
+        if (participant?.isLocal) return;
+        setActiveDrugs((prev) => (prev.includes(message.drug) ? prev : [...prev, message.drug]));
       } catch (e) {
         console.warn('⚠️ Failed to parse incoming data:', e);
       }
     };
-    
-    // Try multiple event names
-    room.on('data_received', handleData);
-    console.log('📡 Attached listener to: data_received');
-    
+
+    room.on(RoomEvent.DataReceived, handleData);
     return () => {
-      console.log('📡 Cleaning up data_received listener');
-      room.off('data_received', handleData);
+      room.off(RoomEvent.DataReceived, handleData);
     };
   }, [room]);
 
