@@ -8,11 +8,14 @@ interface DrugInfoModalProps {
   isExiting?: boolean;
 }
 
+type CollapsibleSection = 'warnings' | 'side_effects' | 'contraindications' | 'interactions';
+
 export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) {
   const [popupData, setPopupData] = useState<PopupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [internalExiting, setInternalExiting] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<CollapsibleSection>>(new Set());
 
   const overlayStyle = { pointerEvents: 'none' as const };
   const modalStyle = {
@@ -110,46 +113,118 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
           </div>
 
           {popupData.warnings && popupData.warnings.length > 0 && (
-            <div className="drug-info-section">
-              <h3 className="drug-section-title warning-title">⚠️ Warnings</h3>
-              <ul className="drug-info-list warning-list">
-                {popupData.warnings.map((warning, idx) => (
-                  <li key={idx}>{warning}</li>
-                ))}
-              </ul>
+            <div className="drug-info-section collapsible">
+              <button
+                className="drug-section-toggle warning-title"
+                onClick={() => {
+                  const newCollapsed = new Set(collapsedSections);
+                  if (newCollapsed.has('warnings')) {
+                    newCollapsed.delete('warnings');
+                  } else {
+                    newCollapsed.add('warnings');
+                  }
+                  setCollapsedSections(newCollapsed);
+                }}
+              >
+                <span className="drug-section-icon">⚠️</span>
+                <span className="drug-section-title-text">Warnings</span>
+                <span className="drug-section-badge warning-badge">{popupData.warnings.length}</span>
+                <span className="drug-section-chevron">{collapsedSections.has('warnings') ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.has('warnings') && (
+                <ul className="drug-info-list warning-list">
+                  {popupData.warnings.map((warning, idx) => (
+                    <li key={idx}>{warning}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
           {popupData.side_effects && popupData.side_effects.length > 0 && (
-            <div className="drug-info-section">
-              <h3 className="drug-section-title">📋 Common Side Effects</h3>
-              <ul className="drug-info-list">
-                {popupData.side_effects.map((effect, idx) => (
-                  <li key={idx}>{effect}</li>
-                ))}
-              </ul>
+            <div className="drug-info-section collapsible">
+              <button
+                className="drug-section-toggle"
+                onClick={() => {
+                  const newCollapsed = new Set(collapsedSections);
+                  if (newCollapsed.has('side_effects')) {
+                    newCollapsed.delete('side_effects');
+                  } else {
+                    newCollapsed.add('side_effects');
+                  }
+                  setCollapsedSections(newCollapsed);
+                }}
+              >
+                <span className="drug-section-icon">📋</span>
+                <span className="drug-section-title-text">Common Side Effects</span>
+                <span className="drug-section-badge info-badge">{popupData.side_effects.length}</span>
+                <span className="drug-section-chevron">{collapsedSections.has('side_effects') ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.has('side_effects') && (
+                <ul className="drug-info-list">
+                  {popupData.side_effects.map((effect, idx) => (
+                    <li key={idx}>{effect}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
           {popupData.contraindications && popupData.contraindications.length > 0 && (
-            <div className="drug-info-section">
-              <h3 className="drug-section-title caution-title">🚫 Contraindications</h3>
-              <ul className="drug-info-list caution-list">
-                {popupData.contraindications.map((contra, idx) => (
-                  <li key={idx}>{contra}</li>
-                ))}
-              </ul>
+            <div className="drug-info-section collapsible">
+              <button
+                className="drug-section-toggle caution-title"
+                onClick={() => {
+                  const newCollapsed = new Set(collapsedSections);
+                  if (newCollapsed.has('contraindications')) {
+                    newCollapsed.delete('contraindications');
+                  } else {
+                    newCollapsed.add('contraindications');
+                  }
+                  setCollapsedSections(newCollapsed);
+                }}
+              >
+                <span className="drug-section-icon">🚫</span>
+                <span className="drug-section-title-text">Contraindications</span>
+                <span className="drug-section-badge caution-badge">{popupData.contraindications.length}</span>
+                <span className="drug-section-chevron">{collapsedSections.has('contraindications') ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.has('contraindications') && (
+                <ul className="drug-info-list caution-list">
+                  {popupData.contraindications.map((contra, idx) => (
+                    <li key={idx}>{contra}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
           {popupData.interactions && popupData.interactions.length > 0 && (
-            <div className="drug-info-section">
-              <h3 className="drug-section-title interaction-title">🔗 Drug Interactions</h3>
-              <ul className="drug-info-list interaction-list">
-                {popupData.interactions.map((interaction, idx) => (
-                  <li key={idx}>{interaction}</li>
-                ))}
-              </ul>
+            <div className="drug-info-section collapsible">
+              <button
+                className="drug-section-toggle interaction-title"
+                onClick={() => {
+                  const newCollapsed = new Set(collapsedSections);
+                  if (newCollapsed.has('interactions')) {
+                    newCollapsed.delete('interactions');
+                  } else {
+                    newCollapsed.add('interactions');
+                  }
+                  setCollapsedSections(newCollapsed);
+                }}
+              >
+                <span className="drug-section-icon">🔗</span>
+                <span className="drug-section-title-text">Drug Interactions</span>
+                <span className="drug-section-badge interaction-badge">{popupData.interactions.length}</span>
+                <span className="drug-section-chevron">{collapsedSections.has('interactions') ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedSections.has('interactions') && (
+                <ul className="drug-info-list interaction-list">
+                  {popupData.interactions.map((interaction, idx) => (
+                    <li key={idx}>{interaction}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

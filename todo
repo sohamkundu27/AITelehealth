@@ -1,16 +1,15 @@
-FLOW:
-
-1. user uplaods PDF of medical DATA
-2. PDF parser to extract text, store in temporary storgae
-3. when STT (speech to text) detects that doctor prescribes a drug, initiate browserbase 
-to check for potential conflicts (show visual indicator that this is happening)
-
-Use livekit for speech to text: https://cloud.livekit.io/projects/p_4cqu6b1dae7/overview
-
-https://docs.livekit.io/agents/start/voice-ai-quickstart/
-https://docs.livekit.io/agents/models/stt/
+Extra batch #1
+- light/dark theme system
+- loading sates and animations
+- enhanced PDF uploads
+- imrpoved conflict indicator
+- Drug modal enhancements
+- UI/UX polish
+- Prescription history
+- mobile responsiveness
 
 
-1) Start server: node server.js
-2) start vite in NEW TERMINAL: npm run dev
+Next:
+- patient/docotr portal (doctor upload medical history)
+- landing page
 
