@@ -2,11 +2,12 @@ import { LiveKitRoom, VideoConference, RoomAudioRenderer } from '@livekit/compon
 import { useEffect, useState, createContext, useContext } from 'react';
 import { PdfUpload } from './components/PdfUpload';
 import { CallWithSTT } from './components/CallWithSTT';
-import { OvershootDemo } from './components/OvershootDemo';
+import { VisualScribe } from './components/VisualScribe';
+import { TranscriptPanel } from './components/TranscriptPanel';
+import { EndCallButton } from './components/EndCallButton';
 import { PatientClarificationPanelContainer } from './components/PatientClarificationPanel';
 import { SessionDebugPanel } from './components/SessionDebugPanel';
 import { VisitManager } from './components/VisitManager';
-import { VisitSummary } from './pages/VisitSummary';
 import { useRole, type UserRole } from './hooks/useRole';
 import { SessionProvider } from './contexts/SessionContext';
 import '@livekit/components-styles';
@@ -18,26 +19,14 @@ const RoleContext = createContext<UserRole>(null);
 export const useRoleContext = () => useContext(RoleContext);
 
 /**
- * Flow: 1) Upload medical PDF → 2) Start call (LiveKit) → 3) STT detects prescriptions
- * → 4) Conflict check (Browserbase or RxNav) with on-screen indicator.
- * → 5) Post-visit safety check and summary
+ * Visual Symptom Logger - Telehealth application that:
+ * 1) Uploads medical PDF → 2) Starts LiveKit call → 3) Records visual symptoms via VisualScribe
+ * → 4) Transcribes audio locally via Whisper → 5) Generates SOAP notes via Gemini
  */
 function App() {
   const [pdfReady, setPdfReady] = useState(false);
   const [token, setToken] = useState('');
   const role = useRole();
-
-  // Check if we're on the visit summary page
-  const path = window.location.pathname;
-  const hash = window.location.hash;
-  if (path.startsWith('/visit-summary/')) {
-    const sessionId = path.split('/visit-summary/')[1];
-    return <VisitSummary sessionId={sessionId} />;
-  }
-  if (hash.startsWith('#/visit-summary/')) {
-    const sessionId = hash.split('#/visit-summary/')[1];
-    return <VisitSummary sessionId={sessionId} />;
-  }
 
   // Fetch LiveKit token only after user has uploaded PDF and clicked "Start call"
   useEffect(() => {
@@ -72,7 +61,7 @@ function App() {
     );
   }
 
-  // Step 3–4: LiveKit call with STT + conflict check
+  // Step 3–5: LiveKit call with VisualScribe + Whisper transcription + Notes generation
   return (
     <SessionProvider>
       <RoleContext.Provider value={role}>
@@ -86,15 +75,26 @@ function App() {
           style={{ height: '100vh', width: '100vw', background: '#000' }}
           onDisconnected={() => console.log('Disconnected from room')}
         >
-        <VisitManager />
-        <CallWithSTT />
-        <OvershootDemo />
-        <PatientClarificationPanelContainer />
-        <SessionDebugPanel />
-        {/* VideoConference handles the layout; grid shows participants. */}
-        <VideoConference />
-        {/* Essential for audio playback */}
-        <RoomAudioRenderer />
+          <VisitManager />
+          <CallWithSTT />
+          
+          {/* Visual Symptom Logger - analyzes remote video for physical symptoms */}
+          <VisualScribe />
+          
+          {/* Local Whisper transcription panel */}
+          <TranscriptPanel />
+          
+          {/* End call button - navigates to Notes page */}
+          <EndCallButton />
+          
+          <PatientClarificationPanelContainer />
+          <SessionDebugPanel />
+          
+          {/* VideoConference handles the layout; grid shows participants. */}
+          <VideoConference />
+          
+          {/* Essential for audio playback */}
+          <RoomAudioRenderer />
         </LiveKitRoom>
       </RoleContext.Provider>
     </SessionProvider>

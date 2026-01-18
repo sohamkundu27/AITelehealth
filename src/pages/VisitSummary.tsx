@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 
 interface VisitSummaryData {
   sessionId: string;
@@ -23,11 +24,9 @@ interface VisitSummaryData {
   clinicianNote?: string;
 }
 
-interface VisitSummaryProps {
-  sessionId: string;
-}
-
-export function VisitSummary({ sessionId }: VisitSummaryProps) {
+export function VisitSummary() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<VisitSummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +73,7 @@ export function VisitSummary({ sessionId }: VisitSummaryProps) {
         <div className="visit-summary-error">
           <h2>Unable to Load Summary</h2>
           <p>{error || 'Visit summary not found'}</p>
-          <button onClick={() => window.location.href = '/'}>
+          <button onClick={() => navigate('/')}>
             Return to Home
           </button>
         </div>
@@ -152,7 +151,7 @@ export function VisitSummary({ sessionId }: VisitSummaryProps) {
             </button>
             <button 
               className="visit-summary-button secondary"
-              onClick={() => window.location.href = '/'}
+              onClick={() => navigate('/')}
             >
               Start New Visit
             </button>

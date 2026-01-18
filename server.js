@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { getDocumentProxy, extractText } from 'unpdf';
 import { generateClinicianNote, generatePatientFollowUp } from './server/utils/messageGenerator.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config({ path: '.env.local' });
 
@@ -367,6 +368,159 @@ app.get('/visit-summary/:sessionId', async (req, res) => {
   } catch (err) {
     console.error('[Visit Summary] Error:', err);
     res.status(500).json({ error: 'Failed to retrieve visit summary' });
+  }
+});
+
+// ============================================================================
+// Visual Symptom Logger Endpoints
+// ============================================================================
+
+/**
+ * Analyze a video frame for physical symptoms.
+ * Placeholder endpoint - you can integrate with a vision AI later.
+ * For now, returns random demo symptom detections.
+ */
+app.post('/api/analyze-frame', express.json({ limit: '10mb' }), async (req, res) => {
+  try {
+    const { image } = req.body;
+    
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'Missing image data' });
+    }
+    
+    // Validate it's a base64 image
+    if (!image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format' });
+    }
+    
+    console.log('[VisualScribe] Received frame for analysis');
+    
+    // Placeholder: In production, send to a vision AI (GPT-4V, Gemini Vision, etc.)
+    // For now, return demo detections with 20% probability
+    const shouldDetect = Math.random() < 0.2;
+    
+    if (shouldDetect) {
+      const actions = ['clutching', 'pointing', 'rubbing', 'holding'];
+      const bodyParts = ['head', 'chest', 'stomach', 'knee', 'arm', 'back'];
+      
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      const bodyPart = bodyParts[Math.floor(Math.random() * bodyParts.length)];
+      
+      const descriptions = {
+        clutching: `Patient is clutching their ${bodyPart}`,
+        pointing: `Patient pointed to their ${bodyPart}`,
+        rubbing: `Patient is rubbing their ${bodyPart}`,
+        holding: `Patient is holding their ${bodyPart}`,
+      };
+      
+      res.json({
+        detected: true,
+        action,
+        bodyPart,
+        description: descriptions[action],
+      });
+    } else {
+      res.json({
+        detected: false,
+        action: 'other',
+        bodyPart: 'other',
+        description: 'No symptoms detected',
+      });
+    }
+  } catch (err) {
+    console.error('[VisualScribe] Analysis error:', err);
+    res.status(500).json({ error: 'Frame analysis failed' });
+  }
+});
+
+/**
+ * Generate medical notes (SOAP format) using Google Gemini.
+ * Combines audio transcript and visual symptom logs.
+ */
+app.post('/api/generate-notes', async (req, res) => {
+  try {
+    const { transcript, visualLogs } = req.body;
+    
+    if (!transcript && !visualLogs) {
+      return res.status(400).json({ error: 'Missing transcript or visualLogs' });
+    }
+    
+    const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      console.warn('[GenerateNotes] No Gemini API key found, returning mock notes');
+      // Return mock notes if no API key
+      const mockNotes = `# Medical Visit Notes
+
+## Subjective
+${transcript?.length ? `Patient described: "${transcript.slice(0, 3).join('. ')}"` : 'No verbal complaints recorded.'}
+
+## Objective
+${visualLogs?.length ? visualLogs.map(log => `- ${log.description}`).join('\n') : 'No visual observations recorded.'}
+
+## Assessment
+Based on the available information, further evaluation may be needed.
+
+## Plan
+1. Follow up with patient regarding symptoms
+2. Consider additional diagnostic tests if symptoms persist
+3. Schedule follow-up appointment in 1-2 weeks
+
+---
+*Note: This is a demo note. Configure GOOGLE_GEMINI_API_KEY for AI-generated notes.*`;
+      
+      return res.json({ notes: mockNotes, source: 'mock' });
+    }
+    
+    console.log('[GenerateNotes] Generating SOAP notes with Gemini');
+    
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    // Build the prompt
+    const transcriptText = Array.isArray(transcript) 
+      ? transcript.join('\n') 
+      : (transcript || 'No transcript available.');
+      
+    const visualLogsText = Array.isArray(visualLogs) && visualLogs.length > 0
+      ? visualLogs.map(log => {
+          const time = new Date(log.timestamp).toLocaleTimeString();
+          return `[${time}] ${log.description} (${log.action} ${log.bodyPart})`;
+        }).join('\n')
+      : 'No visual observations recorded.';
+    
+    const prompt = `You are a medical scribe. Based on the following telehealth visit data, generate professional medical notes in SOAP format.
+
+## Audio Transcript:
+${transcriptText}
+
+## Visual Observations (patient body language):
+${visualLogsText}
+
+Generate a complete SOAP note with the following sections:
+
+1. **Subjective**: Summarize what the patient said about their symptoms, concerns, and medical history based on the transcript.
+
+2. **Objective**: Document the visual observations noted during the call (e.g., "Patient pointed to knee", "Patient appeared to be holding their chest").
+
+3. **Assessment**: Provide a clinical assessment connecting the verbal complaints with the observed body language. Note any correlations (e.g., "Patient's verbal complaint of knee pain is consistent with observed pointing behavior to right knee").
+
+4. **Plan**: Suggest appropriate next steps, follow-up recommendations, and any additional tests or referrals that may be needed.
+
+Format the response in clean Markdown with proper headers. Be professional, concise, and clinically accurate.`;
+    
+    const result = await model.generateContent(prompt);
+    const notes = result.response.text();
+    
+    console.log('[GenerateNotes] Notes generated successfully');
+    
+    res.json({ notes, source: 'gemini' });
+  } catch (err) {
+    console.error('[GenerateNotes] Error:', err);
+    res.status(500).json({ 
+      error: 'Failed to generate notes', 
+      details: err.message 
+    });
   }
 });
 

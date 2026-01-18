@@ -23,6 +23,23 @@ export interface Prescription {
   prescribedBy?: string; // Doctor identity
 }
 
+// New: Visual symptom detection from VisualScribe
+export interface SymptomEvent {
+  id: string;
+  timestamp: number;
+  action: 'clutching' | 'pointing' | 'rubbing' | 'holding' | 'other';
+  bodyPart: 'head' | 'chest' | 'stomach' | 'knee' | 'arm' | 'back' | 'other';
+  description: string;
+}
+
+// New: Transcript entry from local Whisper
+export interface TranscriptEntry {
+  id: string;
+  timestamp: number;
+  text: string;
+  speaker?: 'patient' | 'doctor' | 'unknown';
+}
+
 export interface VisitSession {
   sessionId: string;
   startTime: number;
@@ -32,6 +49,8 @@ export interface VisitSession {
   prescriptions: Prescription[];
   confusionEvents: ConfusionEvent[];
   drugMentions: DrugMention[];
+  symptomLogs: SymptomEvent[]; // New: Visual symptom logs
+  transcriptEntries: TranscriptEntry[]; // New: Transcript from Whisper
   patientHistory?: string[]; // Drugs from PDF
 }
 
@@ -40,10 +59,14 @@ interface SessionState {
   confusionEvents: ConfusionEvent[];
   drugMentions: DrugMention[];
   prescriptions: Prescription[];
+  symptomLogs: SymptomEvent[];
+  transcriptEntries: TranscriptEntry[];
   visitStartTime: number | null;
   addConfusionEvent: (event: Omit<ConfusionEvent, 'id' | 'timestamp'>) => void;
   addDrugMention: (drug: string) => void;
   addPrescription: (prescription: Omit<Prescription, 'timestamp'>) => void;
+  addSymptomLog: (event: Omit<SymptomEvent, 'id' | 'timestamp'>) => void;
+  addTranscriptEntry: (text: string, speaker?: 'patient' | 'doctor' | 'unknown') => void;
   getRecentConfusionEvents: (withinSeconds?: number) => ConfusionEvent[];
   getRecentDrugMentions: (withinSeconds?: number) => DrugMention[];
   linkConfusionToDrug: (confusionId: string, drug: string) => void;
@@ -59,6 +82,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [confusionEvents, setConfusionEvents] = useState<ConfusionEvent[]>([]);
   const [drugMentions, setDrugMentions] = useState<DrugMention[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [symptomLogs, setSymptomLogs] = useState<SymptomEvent[]>([]);
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
   const [visitStartTime, setVisitStartTime] = useState<number | null>(null);
   const [role, setRole] = useState<'doctor' | 'patient' | null>(null);
   const [participantIdentity, setParticipantIdentity] = useState<string | undefined>(undefined);
@@ -116,6 +141,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPrescriptions((prev) => [...prev, newPrescription]);
   }, []);
 
+  const addSymptomLog = useCallback((event: Omit<SymptomEvent, 'id' | 'timestamp'>) => {
+    const newEvent: SymptomEvent = {
+      ...event,
+      id: `symptom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+    };
+    setSymptomLogs((prev) => [...prev, newEvent]);
+    console.log('[Session] Symptom logged:', newEvent);
+  }, []);
+
+  const addTranscriptEntry = useCallback((text: string, speaker: 'patient' | 'doctor' | 'unknown' = 'unknown') => {
+    const entry: TranscriptEntry = {
+      id: `transcript-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      text,
+      speaker,
+    };
+    setTranscriptEntries((prev) => [...prev, entry]);
+  }, []);
+
   const startVisit = useCallback((id: string, visitRole: 'doctor' | 'patient', identity?: string) => {
     setSessionId(id);
     setVisitStartTime(Date.now());
@@ -137,6 +182,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       prescriptions: [...prescriptions],
       confusionEvents: [...confusionEvents],
       drugMentions: [...drugMentions],
+      symptomLogs: [...symptomLogs],
+      transcriptEntries: [...transcriptEntries],
     };
 
     // Reset state
@@ -147,9 +194,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPrescriptions([]);
     setConfusionEvents([]);
     setDrugMentions([]);
+    setSymptomLogs([]);
+    setTranscriptEntries([]);
 
     return visitData;
-  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions]);
+  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions, symptomLogs, transcriptEntries]);
 
   const getVisitData = useCallback((): VisitSession | null => {
     if (!sessionId || !visitStartTime || !role) {
@@ -165,8 +214,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       prescriptions: [...prescriptions],
       confusionEvents: [...confusionEvents],
       drugMentions: [...drugMentions],
+      symptomLogs: [...symptomLogs],
+      transcriptEntries: [...transcriptEntries],
     };
-  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions]);
+  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions, symptomLogs, transcriptEntries]);
 
   return (
     <SessionContext.Provider
@@ -175,10 +226,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         confusionEvents,
         drugMentions,
         prescriptions,
+        symptomLogs,
+        transcriptEntries,
         visitStartTime,
         addConfusionEvent,
         addDrugMention,
         addPrescription,
+        addSymptomLog,
+        addTranscriptEntry,
         getRecentConfusionEvents,
         getRecentDrugMentions,
         linkConfusionToDrug,
