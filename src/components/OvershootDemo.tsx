@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { RealtimeVision } from '@overshoot/sdk';
+import { useSession } from '../contexts/SessionContext';
+
+interface OvershootResult {
+  visual_evidence?: string;
+  current_state?: 'CONFUSION' | 'UNDERSTANDING';
+  should_interrupt?: boolean;
+  intensity_score?: number;
+}
 
 export function OvershootDemo() {
   const [result, setResult] = useState<string>("");
@@ -9,6 +17,7 @@ export function OvershootDemo() {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const visionRef = useRef<RealtimeVision | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
+  const session = useSession();
 
   useEffect(() => {
     const key = import.meta.env.VITE_OVERSHOOT_API_KEY;
@@ -32,6 +41,43 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
         setDebugInfo(`Data rx: ${new Date().toLocaleTimeString()}`);
         if (data && data.result) {
           setResult(data.result);
+          
+          // Parse Overshoot JSON response
+          try {
+            let parsed: OvershootResult;
+            if (typeof data.result === 'string') {
+              // Try to parse as JSON
+              parsed = JSON.parse(data.result);
+            } else {
+              parsed = data.result;
+            }
+            
+            if (parsed.current_state) {
+              // Calculate confidence based on state and intensity
+              let confidence: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+              if (parsed.current_state === 'CONFUSION') {
+                const intensity = parsed.intensity_score || 0;
+                if (intensity > 7) confidence = 'HIGH';
+                else if (intensity > 4) confidence = 'MEDIUM';
+                else confidence = 'LOW';
+              } else {
+                // UNDERSTANDING - lower confidence means less certain
+                confidence = 'LOW'; // We're more interested in tracking confusion
+              }
+              
+              // Add to session state (silent tracking, no doctor alerts)
+              session.addConfusionEvent({
+                state: parsed.current_state,
+                visualEvidence: parsed.visual_evidence || 'No visual evidence provided',
+                confidence,
+              });
+              
+              console.log(`[Overshoot] ${parsed.current_state} detected (confidence: ${confidence})`, parsed);
+            }
+          } catch (e) {
+            // If parsing fails, just display the raw result
+            console.warn('Failed to parse Overshoot result:', e);
+          }
         }
       },
       onError: (err: any) => {
@@ -101,21 +147,50 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
     setIsRunning(true);
     setDebugInfo("Simulating AI (Demo Mode)");
     
-    const responses = [
-        "Person detected looking at screen.",
-        "User is speaking.",
-        "Face is clearly visible.",
-        "Subject is nodding.",
-        "Person appears calm and focused.",
-        "User is adjusting the camera.",
-        "Background contains office setting."
+    // Demo mode: simulate confusion events for testing
+    const demoStates: Array<{ state: 'CONFUSION' | 'UNDERSTANDING'; evidence: string; intensity?: number }> = [
+      { state: 'UNDERSTANDING', evidence: 'Nodding, attentive expression' },
+      { state: 'UNDERSTANDING', evidence: 'Eye contact maintained' },
+      { state: 'CONFUSION', evidence: 'Brow knitted, head tilt', intensity: 6 },
+      { state: 'UNDERSTANDING', evidence: 'Calm, focused' },
+      { state: 'CONFUSION', evidence: 'Lips pursed, slower blinking', intensity: 5 },
     ];
 
+    let index = 0;
     demoIntervalRef.current = setInterval(() => {
-        const randomResp = responses[Math.floor(Math.random() * responses.length)];
-        setResult(randomResp);
+        const demo = demoStates[index % demoStates.length];
+        const demoResult = JSON.stringify({
+          visual_evidence: demo.evidence,
+          current_state: demo.state,
+          intensity_score: demo.intensity || 3,
+        });
+        setResult(demoResult);
         setDebugInfo(`Demo data: ${new Date().toLocaleTimeString()}`);
-    }, 3000) as unknown as number;
+        
+        // Also trigger the onResult handler for demo mode
+        try {
+          const parsed = JSON.parse(demoResult);
+          let confidence: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+          if (parsed.current_state === 'CONFUSION') {
+            const intensity = parsed.intensity_score || 0;
+            if (intensity > 7) confidence = 'HIGH';
+            else if (intensity > 4) confidence = 'MEDIUM';
+            else confidence = 'LOW';
+          } else {
+            confidence = 'LOW';
+          }
+          
+          session.addConfusionEvent({
+            state: parsed.current_state,
+            visualEvidence: parsed.visual_evidence,
+            confidence,
+          });
+        } catch (e) {
+          console.warn('Demo mode parse error:', e);
+        }
+        
+        index++;
+    }, 4000) as unknown as number;
   };
 
   return (

@@ -4,6 +4,7 @@ import { RoomEvent, type RemoteParticipant } from 'livekit-client';
 import { PrescriptionSTT } from './PrescriptionSTT';
 import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 import { DrugInfoModal } from './DrugInfoModal';
+import { useSession } from '../contexts/SessionContext';
 
 /**
  * In-call layer: runs PrescriptionSTT and, when a drug is detected,
@@ -11,6 +12,7 @@ import { DrugInfoModal } from './DrugInfoModal';
  */
 export function CallWithSTT() {
   const room = useRoomContext();
+  const session = useSession();
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
   const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
@@ -18,6 +20,17 @@ export function CallWithSTT() {
   const onPrescriptionDetected = useCallback(async (drug: string) => {
     // Check Against Patient History (Unimplemented)
     console.log('💊 Checking interactions for:', drug);
+    
+    // Track drug mention in session (for linking with confusion events)
+    session.addDrugMention(drug);
+    
+    // Track as prescription (when doctor prescribes, not just mentions)
+    // TODO: Parse dosage/duration from transcript
+    session.addPrescription({
+      drug,
+      prescribedBy: room?.localParticipant?.identity,
+    });
+    
     // Add drug to active list if not already present
     setActiveDrugs((prev) => (prev.includes(drug) ? prev : [...prev, drug]));
     setIsChecking(true);
@@ -57,7 +70,7 @@ export function CallWithSTT() {
     } finally {
       setIsChecking(false);
     }
-  }, [room]);
+  }, [room, session]);
 
   // Listen for incoming drug detections
   useEffect(() => {

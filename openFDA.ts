@@ -1,6 +1,16 @@
-import { HfInference } from "@huggingface/inference";
-
-const hf = new HfInference(import.meta.env.VITE_HUGGINGFACE_API_KEY);
+// Optional HuggingFace import - lazy loaded only when needed
+async function getHfInstance() {
+  try {
+    const { HfInference } = await import("@huggingface/inference");
+    const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
+    if (apiKey) {
+      return new HfInference(apiKey);
+    }
+  } catch (e) {
+    console.warn('HuggingFace inference not available - will use raw data without summarization');
+  }
+  return null;
+}
 
 /**
  * Fetches official labeling data for a specific drug from openFDA.
@@ -141,8 +151,13 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
     // Helper to use LLM to condense text
     const condenseText = async (text: string, maxLength: number = 200): Promise<string> => {
       if (text.length <= maxLength) return text;
+      const hfInstance = await getHfInstance();
+      if (!hfInstance) {
+        // Fallback: just truncate if HuggingFace not available
+        return text.substring(0, maxLength) + "...";
+      }
       try {
-        const result = await hf.summarization({
+        const result = await hfInstance.summarization({
           model: "facebook/bart-large-cnn",
           inputs: text.substring(0, 3000),
           parameters: { max_length: 100, min_length: 10 },
@@ -169,8 +184,14 @@ export async function summarizeToPopupFormat(drugData: DrugData): Promise<PopupD
       
       const combined = validTexts.join(" ").substring(0, 2000);
       
+      const hfInstance = await getHfInstance();
+      if (!hfInstance) {
+        // Fallback: return first few valid texts if HuggingFace not available
+        return validTexts.slice(0, maxItems).map(t => t.substring(0, 200));
+      }
+      
       try {
-        const result = await hf.summarization({
+        const result = await hfInstance.summarization({
           model: "facebook/bart-large-cnn",
           inputs: combined,
           parameters: { max_length: 200, min_length: 40 },
