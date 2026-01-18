@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { useRoomContext } from '@livekit/components-react';
 import { RoomEvent, type RemoteParticipant, ConnectionState } from 'livekit-client';
 import { MonitoringPanel } from './MonitoringPanel';
-import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 import { DrugInfoModal } from './DrugInfoModal';
 import { PrescriptionHistory, type PrescriptionEntry } from './PrescriptionHistory';
 import { useSession } from '../contexts/SessionContext';
@@ -18,7 +17,7 @@ export function CallWithSTT() {
   const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
   const [prescriptionHistory, setPrescriptionHistory] = useState<PrescriptionEntry[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(room?.state ?? ConnectionState.Disconnected);
 
   const onPrescriptionDetected = useCallback(async (drug: string) => {
     console.log('💊 Drug detected:', drug);
@@ -43,6 +42,8 @@ export function CallWithSTT() {
     
     // Add drug to active list if not already present
     setActiveDrugs((prev) => (prev.includes(drug) ? prev : [...prev, drug]));
+    // Add to local prescription history
+    setPrescriptionHistory((prev) => [entry, ...prev]);
 
     // Broadcast to all participants
     if (room?.localParticipant) {
@@ -67,7 +68,6 @@ export function CallWithSTT() {
   // Track connection state
   useEffect(() => {
     if (!room) return;
-    setConnectionState(room.state);
     const updateState = () => setConnectionState(room.state);
     room.on(RoomEvent.ConnectionStateChanged, updateState);
     return () => {
@@ -173,8 +173,7 @@ export function CallWithSTT() {
         `}</style>
       </div>
 
-      {/* Conflict check notifications */}
-      <ConflictCheckIndicator isChecking={isChecking} result={result} drug={activeDrugs[0]} />
+      {/* Conflict check notifications removed (client-only safety handled in DrugInfoModal) */}
 
       {/* Prescription history sidebar */}
       <PrescriptionHistory
