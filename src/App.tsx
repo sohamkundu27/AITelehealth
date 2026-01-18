@@ -2,7 +2,9 @@ import { LiveKitRoom, VideoConference, RoomAudioRenderer } from '@livekit/compon
 import { useEffect, useState } from 'react';
 import { PdfUpload } from './components/PdfUpload';
 import { CallWithSTT } from './components/CallWithSTT';
-import { OvershootDemo } from './components/OvershootDemo';
+import { LandingPage } from './components/LandingPage';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import { PatientClarificationPanelContainer } from './components/PatientClarificationPanel';
 import { VisitManager } from './components/VisitManager';
 import { VisitSummary } from './pages/VisitSummary';
@@ -18,6 +20,7 @@ import { RoleContext } from './contexts/RoleContext';
  * Doctor: Upload patient medical PDF → Join call
  */
 function App() {
+  const [welcomeAcknowledged, setWelcomeAcknowledged] = useState(false);
   const [pdfReady, setPdfReady] = useState(false);
   const [token, setToken] = useState('');
   const role = useRole();
@@ -50,6 +53,17 @@ function App() {
   }
 
   // Step 1: Patient sees "Enter Meeting", Doctor uploads PDF
+  // Step 0: Landing page
+  if (!welcomeAcknowledged) {
+    return (
+      <ThemeProvider>
+        <ThemeToggle />
+        <LandingPage onGetStarted={() => setWelcomeAcknowledged(true)} />
+      </ThemeProvider>
+    );
+  }
+
+  // Step 1: PDF upload
   if (!pdfReady) {
     if (role === 'patient') {
       return (
@@ -78,46 +92,55 @@ function App() {
     
     // Doctor uploads patient medical history
     return (
-      <div className="app-step app-upload">
-        <PdfUpload onReady={() => setPdfReady(true)} />
-      </div>
+      <ThemeProvider>
+        <ThemeToggle />
+        <div className="app-step app-upload">
+          <PdfUpload onReady={() => setPdfReady(true)} />
+        </div>
+      </ThemeProvider>
     );
   }
 
   // Step 2: Waiting for token
   if (!token) {
     return (
-      <div className="app-step app-loading">
-        Loading secure connection…
-      </div>
+      <ThemeProvider>
+        <ThemeToggle />
+        <div className="app-step app-loading">
+          <div className="app-loading-spinner" />
+          <span>Loading secure connection…</span>
+        </div>
+      </ThemeProvider>
     );
   }
 
   // Step 3–4: LiveKit call with STT + conflict check
   return (
-    <SessionProvider>
-      <RoleContext.Provider value={role}>
-        <LiveKitRoom
-          serverUrl={import.meta.env.VITE_PUBLIC_LIVEKIT_URL}
-          token={token}
-          connect={true}
-          video={true}
-          audio={true}
-          data-lk-theme="default"
-          style={{ height: '100vh', width: '100vw', background: '#000' }}
-          onDisconnected={() => console.log('Disconnected from room')}
-        >
-        <VisitManager />
-        <CallWithSTT />
-        <OvershootDemo />
-        <PatientClarificationPanelContainer />
-        {/* VideoConference handles the layout; grid shows participants. */}
-        <VideoConference />
-        {/* Essential for audio playback */}
-        <RoomAudioRenderer />
-        </LiveKitRoom>
-      </RoleContext.Provider>
-    </SessionProvider>
+    <ThemeProvider>
+      <SessionProvider>
+        <RoleContext.Provider value={role}>
+          <ThemeToggle />
+          <LiveKitRoom
+            serverUrl={import.meta.env.VITE_PUBLIC_LIVEKIT_URL}
+            token={token}
+            connect={true}
+            video={true}
+            audio={true}
+            data-lk-theme="default"
+            style={{ height: '100vh', width: '100vw', background: 'var(--bg-primary)' }}
+            onDisconnected={() => console.log('Disconnected from room')}
+          >
+            <VisitManager />
+            <CallWithSTT />
+            <PatientClarificationPanelContainer />
+            {/* VideoConference handles the layout; grid shows participants. */}
+            <VideoConference layout="grid" />
+            {/* Essential for audio playback */}
+            <RoomAudioRenderer />
+          </LiveKitRoom>
+        </RoleContext.Provider>
+      </SessionProvider>
+    </ThemeProvider>
   );
 }
 

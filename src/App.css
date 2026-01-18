@@ -11,12 +11,37 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #111;
-  color: #fff;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease;
+  /* Performance optimization */
+  transform: translateZ(0);
+  will-change: background-color;
 }
 .app-loading {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Loading spinner animation */
+.app-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  will-change: transform;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .logo {
@@ -61,10 +86,11 @@
   height: 100vh !important;
   max-width: none !important;
   max-height: none !important;
-  background: #000 !important;
+  background: var(--bg-primary) !important;
   position:absolute;
   top:0;
   left:0;
+  transition: background-color 0.3s ease;
 }
 
 .lk-focus-layout-wrapper,
@@ -94,8 +120,73 @@ video {
   bottom: 20px !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
-  background: rgba(0,0,0,0.6) !important;
+  background: var(--bg-overlay) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--border-color) !important;
   border-radius: 30px !important;
   padding: 10px 20px !important;
   z-index: 50 !important;
+  box-shadow: var(--shadow-md) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Theme-aware LiveKit button styles */
+.lk-button,
+.lk-button-group button,
+.lk-control-bar button {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  transition: all 0.2s ease !important;
+}
+
+.lk-button:hover,
+.lk-button-group button:hover,
+.lk-control-bar button:hover {
+  background: var(--bg-overlay) !important;
+  border-color: var(--border-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.lk-button:active,
+.lk-button-group button:active,
+.lk-control-bar button:active {
+  background: var(--bg-hover) !important;
+  transform: scale(0.95) !important;
+}
+
+/* LiveKit button text and icons */
+.lk-button span,
+.lk-button-group button span,
+.lk-control-bar button span {
+  color: var(--text-primary) !important;
+}
+
+.lk-button svg,
+.lk-button-group button svg,
+.lk-control-bar button svg {
+  fill: var(--text-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Dropdown menus */
+.lk-button-menu,
+.lk-button-menu-item {
+  background: var(--bg-overlay) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.lk-button-menu-item:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+@media (max-width: 768px) {
+  .lk-control-bar {
+    bottom: 10px !important;
+    padding: 8px 16px !important;
+    border-radius: 25px !important;
+    max-width: calc(100vw - 20px) !important;
+  }
 }

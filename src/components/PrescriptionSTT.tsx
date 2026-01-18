@@ -46,13 +46,14 @@ function extractDrugs(transcript: string): string[] {
 type Props = {
   onPrescriptionDetected: (drug: string) => void;
   disabled?: boolean;
+  compact?: boolean;
 };
 
 /**
  * STT via Web Speech API. Listens to local microphone and detects drug names.
  * When detected, calls onPrescriptionDetected(drug). Runs alongside the LiveKit call.
  */
-export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
+export function PrescriptionSTT({ onPrescriptionDetected, disabled, compact = false }: Props) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastTranscript, setLastTranscript] = useState('');
@@ -155,18 +156,113 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled }: Props) {
       )}
       <style>{`
         .stt-widget {
-          position: fixed; bottom: 80px; left: 20px; z-index: 9998;
-          background: rgba(20,20,28,0.9); backdrop-filter: blur(10px);
-          border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px;
-          color: #fff; font-size: 12px; max-width: 260px;
+          ${compact ? '' : 'position: fixed; bottom: 100px; left: 20px; z-index: 600;'}
+          background: ${compact ? 'transparent' : 'var(--bg-overlay)'};
+          backdrop-filter: ${compact ? 'none' : 'blur(10px)'};
+          -webkit-backdrop-filter: ${compact ? 'none' : 'blur(10px)'};
+          border: ${compact ? 'none' : '1px solid var(--border-color)'};
+          border-radius: ${compact ? '0' : '12px'};
+          padding: ${compact ? '0' : '12px 16px'};
+          color: var(--text-primary);
+          font-size: 12px;
+          max-width: ${compact ? 'none' : '280px'};
+          width: ${compact ? '100%' : 'auto'};
+          box-shadow: ${compact ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.2)'};
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          will-change: transform;
         }
-        .stt-header { display: flex; align-items: center; gap: 8px; }
-        .stt-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-        .stt-dot.on { background: #0f8; box-shadow: 0 0 8px #0f8; }
-        .stt-label { flex: 1; }
-        .stt-btn { background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: 11px; }
-        .stt-err { color: #f66; margin-top: 6px; }
-        .stt-transcript { margin-top: 6px; color: rgba(255,255,255,0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .stt-widget:hover {
+          box-shadow: ${compact ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.25)'};
+          transform: ${compact ? 'none' : 'translateY(-2px)'};
+        }
+        @media (max-width: 768px) {
+          .stt-widget {
+            ${compact ? '' : 'bottom: 120px; left: 10px; right: 10px;'}
+            max-width: none;
+            width: ${compact ? '100%' : 'auto'};
+            padding: ${compact ? '0' : '10px 12px'};
+            font-size: 11px;
+          }
+          .stt-label {
+            font-size: 11px;
+          }
+          .stt-btn {
+            padding: 5px 10px;
+            font-size: 10px;
+          }
+        }
+        .stt-header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .stt-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--border-color);
+          transition: all 0.3s ease;
+        }
+        .stt-dot.on {
+          background: var(--accent-primary);
+          box-shadow: 0 0 12px var(--accent-primary);
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(1.1);
+          }
+        }
+        .stt-label {
+          flex: 1;
+          font-weight: 500;
+          color: var(--text-secondary);
+        }
+        .stt-btn {
+          background: var(--bg-hover);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          padding: 6px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+        .stt-btn:hover:not(:disabled) {
+          background: var(--bg-overlay);
+          border-color: var(--border-hover);
+          transform: scale(1.05);
+        }
+        .stt-btn:active:not(:disabled) {
+          transform: scale(0.95);
+        }
+        .stt-err {
+          color: var(--accent-error);
+          margin-top: 8px;
+          font-size: 11px;
+          padding: 6px;
+          background: rgba(255, 85, 85, 0.1);
+          border-radius: 6px;
+          border-left: 2px solid var(--accent-error);
+        }
+        .stt-transcript {
+          margin-top: 8px;
+          color: var(--text-tertiary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 11px;
+          font-style: italic;
+          padding: 6px;
+          background: var(--bg-hover);
+          border-radius: 6px;
+        }
       `}</style>
     </div>
   );

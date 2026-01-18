@@ -9,7 +9,11 @@ interface OvershootResult {
   intensity_score?: number;
 }
 
-export function OvershootDemo() {
+type Props = {
+  compact?: boolean;
+};
+
+export function OvershootDemo({ compact = false }: Props = {}) {
   const [result, setResult] = useState<string>("");
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,100 +237,136 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
 
       <style>{`
         .overshoot-popup {
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          width: 280px;
-          background: rgba(20, 20, 25, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 16px;
-          padding: 16px;
-          color: white;
-          z-index: 9999;
+          ${compact ? '' : 'position: fixed; bottom: 100px; right: 100px; z-index: 500;'}
+          width: ${compact ? '100%' : '200px'};
+          max-width: ${compact ? 'none' : 'calc(100vw - 120px)'};
+          background: ${compact ? 'transparent' : 'var(--bg-overlay)'};
+          backdrop-filter: ${compact ? 'none' : 'blur(10px)'};
+          -webkit-backdrop-filter: ${compact ? 'none' : 'blur(10px)'};
+          border: ${compact ? 'none' : '1px solid var(--border-color)'};
+          border-radius: ${compact ? '0' : '12px'};
+          padding: ${compact ? '0' : '10px 12px'};
+          color: var(--text-primary);
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
-          transition: all 0.3s ease;
+          box-shadow: ${compact ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.2)'};
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          will-change: opacity;
+          font-size: ${compact ? '12px' : '11px'};
+        }
+        @media (max-width: 768px) {
+          .overshoot-popup {
+            ${compact ? '' : 'bottom: 180px; right: 10px; left: 10px;'}
+            width: ${compact ? '100%' : 'auto'};
+            max-width: none;
+            padding: ${compact ? '0' : '10px'};
+            font-size: 11px;
+          }
         }
 
         .overshoot-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: ${isRunning || error ? '12px' : '0'};
+          margin-bottom: ${isRunning || error ? '8px' : '0'};
+          gap: 6px;
+          flex-wrap: nowrap;
         }
 
         .overshoot-status {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
+          flex: 1;
+          min-width: 0;
         }
 
         .status-dot {
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
-          background-color: #666;
+          background-color: var(--border-color);
           transition: background-color 0.3s ease;
+          flex-shrink: 0;
         }
 
         .status-dot.active {
-          background-color: #00ff88;
-          box-shadow: 0 0 8px #00ff88;
+          background-color: var(--accent-success);
+          box-shadow: 0 0 6px var(--accent-success);
         }
 
         .status-text {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 500;
-          color: rgba(255, 255, 255, 0.7);
+          color: var(--text-secondary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .overshoot-toggle {
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          color: white;
-          padding: 6px 12px;
-          border-radius: 20px;
-          font-size: 12px;
+          background: var(--bg-hover);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 10px;
           font-weight: 600;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background 0.15s ease, transform 0.15s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .overshoot-toggle:hover {
-          background: rgba(255, 255, 255, 0.2);
+          background: var(--bg-overlay);
+          transform: scale(1.05);
+        }
+
+        .overshoot-toggle:active {
+          transform: scale(0.95);
+        }
+
+        @media (max-width: 768px) {
+          .overshoot-toggle {
+            padding: 4px 8px;
+            font-size: 10px;
+          }
+          .status-text {
+            font-size: 10px;
+          }
         }
 
         .overshoot-content {
-          background: rgba(0, 0, 0, 0.2);
-          border-radius: 12px;
-          padding: 12px;
-          min-height: 40px;
+          background: var(--bg-hover);
+          border-radius: 8px;
+          padding: 8px;
+          min-height: 30px;
         }
 
         .overshoot-result {
-          font-size: 14px;
-          line-height: 1.4;
+          font-size: 11px;
+          line-height: 1.3;
           margin: 0;
-          color: rgba(255, 255, 255, 0.9);
+          color: var(--text-secondary);
           animation: fadeIn 0.3s ease;
         }
 
         .overshoot-waiting {
-          font-size: 13px;
-          color: rgba(255, 255, 255, 0.4);
+          font-size: 10px;
+          color: var(--text-tertiary);
           margin: 0;
           font-style: italic;
+          line-height: 1.3;
         }
 
         .overshoot-error {
-          font-size: 13px;
-          color: #ff6b6b;
-          margin-bottom: 8px;
-          padding: 8px;
-          background: rgba(255, 107, 107, 0.1);
-          border-radius: 8px;
+          font-size: 10px;
+          color: var(--accent-error);
+          margin-bottom: 6px;
+          padding: 6px;
+          background: rgba(255, 85, 85, 0.1);
+          border-radius: 6px;
+          border-left: 2px solid var(--accent-error);
         }
 
         @keyframes fadeIn {
