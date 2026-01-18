@@ -152,8 +152,10 @@ async function checkInteractionsBrowserbase(newDrug, existingDrugs) {
 
 const createToken = async (role = 'doctor') => {
   const roomName = 'quick-chat-room';
-  // Include role in identity for easy identification: "doctor-1234" or "patient-1234"
-  const participantName = `${role}-${Math.floor(Math.random() * 10000)}`;
+  // Hardcoded identity: doctor-7822 for doctor, random for patient
+  const participantName = role === 'doctor' 
+    ? 'doctor-7822' 
+    : `patient-${Math.floor(Math.random() * 10000)}`;
 
   const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
     identity: participantName,
