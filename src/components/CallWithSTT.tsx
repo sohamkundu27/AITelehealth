@@ -5,6 +5,7 @@ import { MonitoringPanel } from './MonitoringPanel';
 import { ConflictCheckIndicator } from './ConflictCheckIndicator';
 import { DrugInfoModal } from './DrugInfoModal';
 import { PrescriptionHistory, type PrescriptionEntry } from './PrescriptionHistory';
+import { useSession } from '../contexts/SessionContext';
 
 /**
  * In-call layer: runs PrescriptionSTT and, when a drug is detected,
@@ -13,6 +14,7 @@ import { PrescriptionHistory, type PrescriptionEntry } from './PrescriptionHisto
  */
 export function CallWithSTT() {
   const room = useRoomContext();
+  const session = useSession();
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<{ hasConflict: boolean; details: string; source?: string } | null>(null);
   const [activeDrugs, setActiveDrugs] = useState<string[]>([]);
@@ -24,13 +26,23 @@ export function CallWithSTT() {
     // Check Against Patient History (Unimplemented)
     console.log('💊 Checking interactions for:', drug);
     
-    // Create prescription entry
+    // Create prescription entry for history
     const entryId = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
     const entry: PrescriptionEntry = {
       id: entryId,
       drug,
       timestamp: Date.now(),
     };
+
+    // Track drug mention in session (for linking with confusion events)
+    session.addDrugMention(drug);
+    
+    // Track as prescription (when doctor prescribes, not just mentions)
+    // TODO: Parse dosage/duration from transcript
+    session.addPrescription({
+      drug,
+      prescribedBy: room?.localParticipant?.identity,
+    });
     
     // Add drug to active list if not already present
     setActiveDrugs((prev) => (prev.includes(drug) ? prev : [...prev, drug]));
@@ -76,7 +88,7 @@ export function CallWithSTT() {
     } finally {
       setIsChecking(false);
     }
-  }, [room]);
+  }, [room, session]);
 
   // Track connection state
   useEffect(() => {

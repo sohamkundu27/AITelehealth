@@ -4,11 +4,16 @@ import { AccessToken } from 'livekit-server-sdk';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { getDocumentProxy, extractText } from 'unpdf';
+import { generateClinicianNote, generatePatientFollowUp } from './server/utils/messageGenerator.js';
 
 dotenv.config({ path: '.env.local' });
 
 // Temporary in-memory store for parsed PDF (text + extracted drugs)
 let storedPdf = { text: null, drugs: [] };
+
+// Session storage for visit data (in-memory Map)
+// Key: sessionId, Value: visit session data
+const visitSessions = new Map();
 
 /**
  * Heuristic extraction of likely drug names from medical text.
@@ -144,9 +149,10 @@ async function checkInteractionsBrowserbase(newDrug, existingDrugs) {
   }
 }
 
-const createToken = async () => {
+const createToken = async (role = 'doctor') => {
   const roomName = 'quick-chat-room';
-  const participantName = 'user-' + Math.floor(Math.random() * 10000);
+  // Include role in identity for easy identification: "doctor-1234" or "patient-1234"
+  const participantName = `${role}-${Math.floor(Math.random() * 10000)}`;
 
   const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
     identity: participantName,
@@ -228,11 +234,139 @@ app.post('/check-interactions', async (req, res) => {
 
 app.get('/getToken', async (req, res) => {
   try {
-    const token = await createToken();
+    // Get role from query parameter, default to 'doctor' for backward compatibility
+    const role = req.query.role === 'patient' ? 'patient' : 'doctor';
+    const token = await createToken(role);
     res.send(token);
   } catch (err) {
     console.error(err);
     res.status(500).send('Could not generate token');
+  }
+});
+
+// Post-visit safety check endpoint
+
+app.post('/post-visit-safety-check', async (req, res) => {
+  try {
+    const { sessionId, prescriptions, patientHistory, role } = req.body;
+
+    if (!sessionId || !prescriptions || !Array.isArray(prescriptions)) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    console.log(`[Post-Visit] Safety check for session ${sessionId}`);
+    console.log(`[Post-Visit] Prescriptions: ${prescriptions.length}`);
+    console.log(`[Post-Visit] Patient history: ${patientHistory?.length || 0} drugs`);
+
+    // Get patient history from stored PDF
+    const existingDrugs = storedPdf.drugs || [];
+    const allPatientDrugs = [...existingDrugs, ...(patientHistory || [])];
+
+    // Perform safety checks
+    const safetyCheck = {
+      sessionId,
+      prescriptions,
+      patientHistory: allPatientDrugs,
+      interactions: [],
+      risks: [],
+    };
+
+    // Check for ACE inhibitor + NSAID combination (renal risk)
+    const aceInhibitors = prescriptions.filter(p => 
+      p.drug.toLowerCase().includes('lisinopril') ||
+      p.drug.toLowerCase().includes('ace') ||
+      p.drug.toLowerCase().includes('pril')
+    );
+    
+    const nsaids = prescriptions.filter(p => 
+      p.drug.toLowerCase().includes('naproxen') ||
+      p.drug.toLowerCase().includes('ibuprofen') ||
+      p.drug.toLowerCase().includes('nsaid')
+    );
+
+    if (aceInhibitors.length > 0 && nsaids.length > 0) {
+      safetyCheck.risks.push({
+        type: 'renal_risk',
+        severity: 'moderate',
+        description: 'ACE inhibitor + NSAID combination may increase renal risk',
+        drugs: [aceInhibitors[0].drug, nsaids[0].drug],
+      });
+    }
+
+    // Check for interactions with existing medications
+    for (const prescription of prescriptions) {
+      if (allPatientDrugs.length > 0) {
+        try {
+          const interactionResult = await checkInteractionsRxNav(
+            prescription.drug,
+            allPatientDrugs
+          );
+          if (interactionResult.hasConflict) {
+            safetyCheck.interactions.push({
+              drug: prescription.drug,
+              interaction: interactionResult.details,
+            });
+          }
+        } catch (e) {
+          console.warn(`Interaction check failed for ${prescription.drug}:`, e);
+        }
+      }
+    }
+
+    // Generate messages
+    const clinicianNote = generateClinicianNote(safetyCheck);
+    const patientFollowUp = generatePatientFollowUp(safetyCheck);
+
+    // Store visit session with safety check results
+    const visitData = {
+      sessionId,
+      startTime: Date.now() - 3600000, // Approximate (would be from actual visit)
+      endTime: Date.now(),
+      prescriptions,
+      patientHistory: allPatientDrugs,
+      safetyCheck,
+      clinicianNote,
+      patientFollowUp,
+      role: role || 'patient',
+      createdAt: Date.now(),
+    };
+
+    visitSessions.set(sessionId, visitData);
+
+    console.log(`[Post-Visit] Safety check complete for ${sessionId}`);
+    console.log(`[Post-Visit] Clinician note: ${clinicianNote.substring(0, 100)}...`);
+    console.log(`[Post-Visit] Patient follow-up: ${patientFollowUp.substring(0, 100)}...`);
+
+    res.json({
+      sessionId,
+      safetyCheck,
+      clinicianNote,
+      patientFollowUp,
+      success: true,
+    });
+  } catch (err) {
+    console.error('[Post-Visit] Safety check error:', err);
+    res.status(500).json({
+      error: 'Post-visit safety check failed',
+      details: err.message,
+    });
+  }
+});
+
+// Get visit summary by session ID
+app.get('/visit-summary/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const visitData = visitSessions.get(sessionId);
+
+    if (!visitData) {
+      return res.status(404).json({ error: 'Visit session not found' });
+    }
+
+    res.json(visitData);
+  } catch (err) {
+    console.error('[Visit Summary] Error:', err);
+    res.status(500).json({ error: 'Failed to retrieve visit summary' });
   }
 });
 

@@ -19,7 +19,7 @@ const COMMON_DRUGS = [
   'cidofovir', 'foscarnet', 'famciclovir', 'penciclovir', 'trifluridine', 'idoxuridine', 'podofilox', 'imiquimod',
   'sinecatechins', 'podophyllin', 'cryotherapy', 'interferon', 'peginterferon', 'ribavirin', 'sofosbuvir', 'ledipasvir',
   'velpatasvir', 'voxilaprevir', 'glecaprevir', 'pibrentasvir', 'simeprevir', 'boceprevir', 'telaprevir', 'danoprevir',
-  'asunaprevir', 'daclatasvir', 'faldaprevir', 'alisporivir', 'miravirsen', 'metavir', 'heplisav', 'engerix', 'recombivax'
+  'asunaprevir', 'daclatasvir', 'faldaprevir', 'alisporivir', 'miravirsen', 'metavir', 'heplisav', 'engerix', 'recombivax', 'naproxen'
 ];
 
 /**

@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { RealtimeVision } from '@overshoot/sdk';
+import { useSession } from '../contexts/SessionContext';
+
+interface OvershootResult {
+  visual_evidence?: string;
+  current_state?: 'CONFUSION' | 'UNDERSTANDING';
+  should_interrupt?: boolean;
+  intensity_score?: number;
+}
 
 type Props = {
   compact?: boolean;
@@ -13,6 +21,7 @@ export function OvershootDemo({ compact = false }: Props = {}) {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const visionRef = useRef<RealtimeVision | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
+  const session = useSession();
 
   useEffect(() => {
     const key = import.meta.env.VITE_OVERSHOOT_API_KEY;
@@ -26,7 +35,7 @@ export function OvershootDemo({ compact = false }: Props = {}) {
     visionRef.current = new RealtimeVision({
       apiUrl: 'https://cluster1.overshoot.ai/api/v0.2',
       apiKey: key,
-      prompt: `Role: You are an expert Communication Analyst observing a patient during a telehealth call. Your sole purpose is to detect if the patient understands the doctor's explanation. Objective: Real-time classification of the patient's level of comprehension. You must accurately distinguish between "Thinking/Processing" (Good) and "Confusion" (Bad).Input Context: Video stream of a patient.Analysis Logic:Differentiate:Processing Information: Eyes looking up/away, stillness, neutral mouth. $\rightarrow$ DO NOT INTERRUPT.Confusion: Eyebrows knitted together, head tilt, lips pursed, stopped blinking. $\rightarrow$ INTERRUPT. Classification Labels:CONFUSION: Slight uncertainty, squinting, slower nodding.UNDERSTANDING: Nodding, verbal backchanneling cues (smiling/agreement), attentive.Negative Constraints (Critical):Do NOT classify "nodding" as confusion.Do NOT classify "thinking/looking away to recall" as Disengaged.Do NOT classify "adjusting glasses" or "screen glare squint" as confusion.Output Format:Return ONLY a single valid JSON object. No conversational text.JSON{
+      prompt: `Role: You are an expert Communication Analyst observing a patient during a telehealth call. Your sole purpose is to detect if the patient understands the doctor's explanation. Objective: Real-time classification of the patient's level of comprehension. You must accurately distinguish between "Thinking/Processing" (Good) and "Confusion" (Bad).Input Context: Video stream of a patient.Analysis Logic:Differentiate:Processing Information: Nodding, eyes focused. $\rightarrow$ DO NOT INTERRUPT.Confusion: Eyebrows knitted together, head tilt, lips pursed, stopped blinking. $\rightarrow$ INTERRUPT. Classification Labels:CONFUSION: Slight uncertainty, squinting.UNDERSTANDING: Nodding, verbal backchanneling cues (smiling/agreement), attentive.Negative Constraints (Critical):Do NOT classify "nodding" as confusion.Do NOT classify "thinking/looking away to recall" as Disengaged.Do NOT classify "adjusting glasses" or "screen glare squint" as confusion.Output Format:Return ONLY a single valid JSON object. No conversational text.JSON{
   "visual_evidence": "Brief description of the facial cue (e.g., 'Brow knitted + Head tilt')",
   "current_state": "CONFUSION" | "UNDERSTANDING",
 }
@@ -36,6 +45,43 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
         setDebugInfo(`Data rx: ${new Date().toLocaleTimeString()}`);
         if (data && data.result) {
           setResult(data.result);
+          
+          // Parse Overshoot JSON response
+          try {
+            let parsed: OvershootResult;
+            if (typeof data.result === 'string') {
+              // Try to parse as JSON
+              parsed = JSON.parse(data.result);
+            } else {
+              parsed = data.result;
+            }
+            
+            if (parsed.current_state) {
+              // Calculate confidence based on state and intensity
+              let confidence: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+              if (parsed.current_state === 'CONFUSION') {
+                const intensity = parsed.intensity_score || 0;
+                if (intensity > 7) confidence = 'HIGH';
+                else if (intensity > 4) confidence = 'MEDIUM';
+                else confidence = 'LOW';
+              } else {
+                // UNDERSTANDING - lower confidence means less certain
+                confidence = 'LOW'; // We're more interested in tracking confusion
+              }
+              
+              // Add to session state (silent tracking, no doctor alerts)
+              session.addConfusionEvent({
+                state: parsed.current_state,
+                visualEvidence: parsed.visual_evidence || 'No visual evidence provided',
+                confidence,
+              });
+              
+              console.log(`[Overshoot] ${parsed.current_state} detected (confidence: ${confidence})`, parsed);
+            }
+          } catch (e) {
+            // If parsing fails, just display the raw result
+            console.warn('Failed to parse Overshoot result:', e);
+          }
         }
       },
       onError: (err: any) => {
@@ -105,21 +151,50 @@ Logic for should_interrupt: Set to TRUE only if (current_state is CONFUSION_HIGH
     setIsRunning(true);
     setDebugInfo("Simulating AI (Demo Mode)");
     
-    const responses = [
-        "Person detected looking at screen.",
-        "User is speaking.",
-        "Face is clearly visible.",
-        "Subject is nodding.",
-        "Person appears calm and focused.",
-        "User is adjusting the camera.",
-        "Background contains office setting."
+    // Demo mode: simulate confusion events for testing
+    const demoStates: Array<{ state: 'CONFUSION' | 'UNDERSTANDING'; evidence: string; intensity?: number }> = [
+      { state: 'UNDERSTANDING', evidence: 'Nodding, attentive expression' },
+      { state: 'UNDERSTANDING', evidence: 'Eye contact maintained' },
+      { state: 'CONFUSION', evidence: 'Brow knitted, head tilt', intensity: 6 },
+      { state: 'UNDERSTANDING', evidence: 'Calm, focused' },
+      { state: 'CONFUSION', evidence: 'Lips pursed, slower blinking', intensity: 5 },
     ];
 
+    let index = 0;
     demoIntervalRef.current = setInterval(() => {
-        const randomResp = responses[Math.floor(Math.random() * responses.length)];
-        setResult(randomResp);
+        const demo = demoStates[index % demoStates.length];
+        const demoResult = JSON.stringify({
+          visual_evidence: demo.evidence,
+          current_state: demo.state,
+          intensity_score: demo.intensity || 3,
+        });
+        setResult(demoResult);
         setDebugInfo(`Demo data: ${new Date().toLocaleTimeString()}`);
-    }, 3000) as unknown as number;
+        
+        // Also trigger the onResult handler for demo mode
+        try {
+          const parsed = JSON.parse(demoResult);
+          let confidence: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+          if (parsed.current_state === 'CONFUSION') {
+            const intensity = parsed.intensity_score || 0;
+            if (intensity > 7) confidence = 'HIGH';
+            else if (intensity > 4) confidence = 'MEDIUM';
+            else confidence = 'LOW';
+          } else {
+            confidence = 'LOW';
+          }
+          
+          session.addConfusionEvent({
+            state: parsed.current_state,
+            visualEvidence: parsed.visual_evidence,
+            confidence,
+          });
+        } catch (e) {
+          console.warn('Demo mode parse error:', e);
+        }
+        
+        index++;
+    }, 4000) as unknown as number;
   };
 
   return (
