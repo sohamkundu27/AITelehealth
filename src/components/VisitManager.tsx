@@ -87,8 +87,28 @@ async function triggerPostVisitSafetyCheck(visitData: any) {
       sessionStorage.setItem('lastVisitSessionId', result.sessionId);
     }
     
+    // If doctor, store transcript and redirect to transcript page
+    if (visitData.role === 'doctor') {
+      const transcriptData = {
+        sessionId: visitData.sessionId,
+        completeScript: visitData.completeScript || '',
+        prescriptions: visitData.prescriptions.map((p: any) => ({
+          drug: p.drug,
+          dosage: p.dosage,
+          duration: p.duration,
+        })),
+        startTime: visitData.startTime,
+        endTime: visitData.endTime,
+      };
+      sessionStorage.setItem(`transcript-${visitData.sessionId}`, JSON.stringify(transcriptData));
+      
+      // Small delay to let the disconnect complete
+      setTimeout(() => {
+        window.location.href = `/visit-transcript/${visitData.sessionId}`;
+      }, 1000);
+    }
     // If patient, redirect to summary page
-    if (visitData.role === 'patient' && result.sessionId) {
+    else if (visitData.role === 'patient' && result.sessionId) {
       // Small delay to let the disconnect complete
       setTimeout(() => {
         window.location.href = `/visit-summary/${result.sessionId}`;

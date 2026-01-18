@@ -8,6 +8,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { PatientClarificationPanelContainer } from './components/PatientClarificationPanel';
 import { VisitManager } from './components/VisitManager';
 import { VisitSummary } from './pages/VisitSummary';
+import { TranscriptSummary } from './pages/TranscriptSummary';
 import { useRole } from './hooks/useRole';
 import { SessionProvider } from './contexts/SessionContext';
 import '@livekit/components-styles';
@@ -32,6 +33,10 @@ function App() {
     ? path.split('/visit-summary/')[1]
     : (hash.startsWith('#/visit-summary/') ? hash.split('#/visit-summary/')[1] : null);
 
+  const transcriptSessionId = path.startsWith('/visit-transcript/')
+    ? path.split('/visit-transcript/')[1]
+    : (hash.startsWith('#/visit-transcript/') ? hash.split('#/visit-transcript/')[1] : null);
+
   // Fetch LiveKit token once ready
   useEffect(() => {
     if (!pdfReady) return;
@@ -49,7 +54,22 @@ function App() {
 
   // Render visit summary when routed
   if (summarySessionId) {
-    return <VisitSummary sessionId={summarySessionId} />;
+    return (
+      <ThemeProvider>
+        <ThemeToggle />
+        <VisitSummary sessionId={summarySessionId} />
+      </ThemeProvider>
+    );
+  }
+
+  // Render transcript summary when routed
+  if (transcriptSessionId) {
+    return (
+      <ThemeProvider>
+        <ThemeToggle />
+        <TranscriptSummary />
+      </ThemeProvider>
+    );
   }
 
   // Step 1: Patient sees "Enter Meeting", Doctor uploads PDF

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSession } from '../contexts/SessionContext';
 
 const COMMON_DRUGS = [
   'lisinopril', 'metoprolol', 'atorvastatin', 'omeprazole', 'metformin', 'sertraline', 'amlodipine', 'albuterol',
@@ -60,8 +61,10 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled, compact = fa
   const recRef = useRef<{ start?: () => void; stop?: () => void } | null>(null);
   const lastDrugRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scriptRef = useRef<string>(''); // Local ref to track complete script
   const listeningRef = useRef(false);
   listeningRef.current = listening;
+  const session = useSession();
 
   const onResult = useCallback(
     (e: { results?: { [i: number]: { [j: number]: { transcript?: string } } }; resultIndex?: number }) => {
@@ -69,6 +72,17 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled, compact = fa
       const t = (e.results?.[idx]?.[0]?.transcript || '').trim();
       if (!t) return;
       setLastTranscript(t);
+      
+      // Update local script ref with line breaks
+      scriptRef.current = scriptRef.current ? `${scriptRef.current}\n${t}` : t;
+      
+      // Add to complete script in session context
+      session.addToScript(t);
+      
+      // Console log the accumulated script
+      console.log('📝 Complete Script (Doctor):', scriptRef.current);
+      console.log('🎙️ Latest transcription:', t);
+      
       const drugs = extractDrugs(t);
       
       // Process all detected drugs
@@ -85,7 +99,7 @@ export function PrescriptionSTT({ onPrescriptionDetected, disabled, compact = fa
         onPrescriptionDetected(drug);
       }
     },
-    [onPrescriptionDetected]
+    [onPrescriptionDetected, session]
   );
 
   useEffect(() => {

@@ -11,6 +11,7 @@ export default defineConfig({
       '/check-interactions': 'http://localhost:3001',
       '/post-visit-safety-check': 'http://localhost:3001',
       '/visit-summary': 'http://localhost:3001',
+      '/summarize-transcript': 'http://localhost:3001',
       '/api': 'http://localhost:3001',
       '/health': 'http://localhost:3001',
     },

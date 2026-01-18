@@ -11,12 +11,19 @@ interface DrugInfoModalProps {
 type CollapsibleSection = 'warnings' | 'side_effects' | 'contraindications' | 'interactions';
 
 export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) {
+  // Hardcoded list of medications that should always be marked as unsafe in the popup
+  const ALWAYS_UNSAFE: string[] = [
+    // Edit this list to add/remove unsafe medications (case-insensitive)
+    'Ibuprofen',
+  ];
+
   const [popupData, setPopupData] = useState<PopupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [internalExiting, setInternalExiting] = useState(false);
   const [safety, setSafety] = useState<SafetyResult | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<CollapsibleSection>>(new Set());
+  const [unsafeOverride, setUnsafeOverride] = useState<boolean>(false);
 
   const overlayStyle = { pointerEvents: 'none' as const };
   const modalStyle = {
@@ -43,7 +50,20 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
         // Fetch patient history and evaluate safety
         const patient = await getPatientHistory();
         const safetyRes = await evaluateDrugSafety(drug, drugInfo, patient);
-        setSafety(safetyRes);
+        // Apply hardcoded unsafe override when the drug matches the list (case-insensitive)
+        const isOverride = ALWAYS_UNSAFE.some((d) => d.toLowerCase() === String(drug).toLowerCase());
+        if (isOverride) {
+          setUnsafeOverride(true);
+          setSafety({
+            ...safetyRes,
+            decision: 'unsafe',
+            confidence: Math.max(0.95, safetyRes?.confidence ?? 0.95),
+            source: 'heuristic',
+            rationale: 'Conflicts with existing medications',
+          });
+        } else {
+          setSafety(safetyRes);
+        }
       } catch (err) {
         console.error('Failed to fetch drug info:', err);
         setError('Failed to load drug information');
@@ -108,6 +128,11 @@ export function DrugInfoModal({ drug, onClose, isExiting }: DrugInfoModalProps) 
         </div>
 
         <div className="drug-modal-content">
+          {unsafeOverride && (
+            <div className="unsafe-override-banner" title="Policy override: always unsafe">
+              ⚠️ This medication is flagged as unsafe for patient.
+            </div>
+          )}
           <div className="drug-info-section">
             <h3 className="drug-section-title">Purpose</h3>
             <div className="drug-info-row">

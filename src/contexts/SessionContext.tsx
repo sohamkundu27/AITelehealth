@@ -33,6 +33,7 @@ export interface VisitSession {
   confusionEvents: ConfusionEvent[];
   drugMentions: DrugMention[];
   patientHistory?: string[]; // Drugs from PDF
+  completeScript?: string; // Full transcribed script for doctor
 }
 
 interface SessionState {
@@ -41,9 +42,11 @@ interface SessionState {
   drugMentions: DrugMention[];
   prescriptions: Prescription[];
   visitStartTime: number | null;
+  completeScript: string; // Complete transcribed script for doctor
   addConfusionEvent: (event: Omit<ConfusionEvent, 'id' | 'timestamp'>) => void;
   addDrugMention: (drug: string) => void;
   addPrescription: (prescription: Omit<Prescription, 'timestamp'>) => void;
+  addToScript: (text: string) => void; // Add to complete script
   getRecentConfusionEvents: (withinSeconds?: number) => ConfusionEvent[];
   getRecentDrugMentions: (withinSeconds?: number) => DrugMention[];
   linkConfusionToDrug: (confusionId: string, drug: string) => void;
@@ -62,6 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [visitStartTime, setVisitStartTime] = useState<number | null>(null);
   const [role, setRole] = useState<'doctor' | 'patient' | null>(null);
   const [participantIdentity, setParticipantIdentity] = useState<string | undefined>(undefined);
+  const [completeScript, setCompleteScript] = useState<string>('');
 
   const addConfusionEvent = useCallback((event: Omit<ConfusionEvent, 'id' | 'timestamp'>) => {
     const newEvent: ConfusionEvent = {
@@ -90,6 +94,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       timestamp: Date.now(),
     };
     setDrugMentions((prev) => [...prev, mention]);
+  }, []);
+
+  const addToScript = useCallback((text: string) => {
+    setCompleteScript((prev) => {
+      const updated = prev ? `${prev}\n${text}` : text;
+      return updated;
+    });
   }, []);
 
   const getRecentConfusionEvents = useCallback((withinSeconds = 30) => {
@@ -137,6 +148,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       prescriptions: [...prescriptions],
       confusionEvents: [...confusionEvents],
       drugMentions: [...drugMentions],
+      completeScript,
     };
 
     // Reset state
@@ -147,6 +159,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPrescriptions([]);
     setConfusionEvents([]);
     setDrugMentions([]);
+    setCompleteScript('');
 
     return visitData;
   }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions]);
@@ -165,8 +178,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       prescriptions: [...prescriptions],
       confusionEvents: [...confusionEvents],
       drugMentions: [...drugMentions],
+      completeScript,
     };
-  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions]);
+  }, [sessionId, visitStartTime, role, participantIdentity, prescriptions, confusionEvents, drugMentions, completeScript]);
 
   return (
     <SessionContext.Provider
@@ -176,9 +190,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         drugMentions,
         prescriptions,
         visitStartTime,
+        completeScript,
         addConfusionEvent,
         addDrugMention,
         addPrescription,
+        addToScript,
         getRecentConfusionEvents,
         getRecentDrugMentions,
         linkConfusionToDrug,

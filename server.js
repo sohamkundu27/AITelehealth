@@ -402,6 +402,77 @@ app.get('/visit-summary/:sessionId', async (req, res) => {
   }
 });
 
+// POST /summarize-transcript - Generate meeting summary using Gemini
+app.post('/summarize-transcript', express.json(), async (req, res) => {
+  try {
+    const { transcript } = req.body;
+    
+    console.log('[Summarize] Received transcript length:', transcript?.length || 0);
+    console.log('[Summarize] Transcript content:', transcript?.substring(0, 200) || 'EMPTY');
+    
+    if (!transcript || transcript.trim().length === 0) {
+      return res.status(400).json({ error: 'No transcript provided' });
+    }
+
+    const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
+    
+    if (!GEMINI_API_KEY) {
+      console.warn('[Summarize] No GEMINI_API_KEY found, using basic summarization');
+      // Fallback: simple summarization (first few lines)
+      const lines = transcript.split('\n').filter(l => l.trim());
+      const summary = lines.length <= 3 
+        ? transcript 
+        : `Meeting covered: ${lines.slice(0, 3).join('. ')}... (${lines.length} total statements)`;
+      return res.json({ summary });
+    }
+
+    try {
+      // Use Google Gemini API
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      
+      // Use gemini-pro (standard free model)
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      
+      const prompt = `You are analyzing a medical consultation transcript between a doctor and patient.
+
+IMPORTANT CONTEXT:
+- This transcript was created using voice-to-text speech recognition
+- Words may be misheard, misspelled, or transcribed incorrectly
+- Focus on the overall meaning and clinical intent rather than exact wording
+- Extract medically relevant information
+
+TRANSCRIPT:
+${transcript}
+
+Please provide a concise medical summary that includes:
+1. Key symptoms or complaints discussed
+2. Medications mentioned or prescribed
+3. Clinical assessments or diagnoses (if any)
+4. Follow-up instructions or next steps
+5. Note any parts that seem unclear due to possible transcription errors
+
+Provide a clear, professional summary suitable for medical records.`;
+
+      console.log('[Summarize] Sending to Gemini...');
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const summary = response.text() || 'Summary generation failed';
+      
+      console.log('[Summarize] Gemini response received, length:', summary.length);
+      
+      res.json({ summary });
+    } catch (geminiError) {
+      console.error('[Summarize] Gemini error:', geminiError);
+      throw geminiError;
+    }
+  } catch (err) {
+    console.error('[Summarize] Error:', err);
+    res.status(500).json({ error: 'Failed to generate summary' });
+  }
+});
+
 // SPA and static files last
 app.use(express.static('dist'));
 
