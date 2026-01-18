@@ -48,12 +48,16 @@
   color-scheme: light;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   padding: 0;
   min-width: 100vw;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
   background: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -61,6 +65,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* Allow vertical scrolling on landing page */
+body:has(.landing-page) {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #root {

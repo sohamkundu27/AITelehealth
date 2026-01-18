@@ -2,16 +2,18 @@ import { LiveKitRoom, VideoConference, RoomAudioRenderer } from '@livekit/compon
 import { useEffect, useState } from 'react';
 import { PdfUpload } from './components/PdfUpload';
 import { CallWithSTT } from './components/CallWithSTT';
+import { LandingPage } from './components/LandingPage';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
 import '@livekit/components-styles';
 import './App.css';
 
 /**
- * Flow: 1) Upload medical PDF → 2) Start call (LiveKit) → 3) STT detects prescriptions
+ * Flow: 0) Landing page → 1) Upload medical PDF → 2) Start call (LiveKit) → 3) STT detects prescriptions
  * → 4) Conflict check (Browserbase or RxNav) with on-screen indicator.
  */
 function App() {
+  const [welcomeAcknowledged, setWelcomeAcknowledged] = useState(false);
   const [pdfReady, setPdfReady] = useState(false);
   const [token, setToken] = useState('');
 
@@ -27,6 +29,16 @@ function App() {
       }
     })();
   }, [pdfReady]);
+
+  // Step 0: Landing page
+  if (!welcomeAcknowledged) {
+    return (
+      <ThemeProvider>
+        <ThemeToggle />
+        <LandingPage onGetStarted={() => setWelcomeAcknowledged(true)} />
+      </ThemeProvider>
+    );
+  }
 
   // Step 1: PDF upload
   if (!pdfReady) {
