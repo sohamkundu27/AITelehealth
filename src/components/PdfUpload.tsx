@@ -124,7 +124,12 @@ export function PdfUpload({ onReady, onDrugCount }: Props) {
 
   return (
     <div className="pdf-upload">
-      <h2>1. Upload medical data (PDF)</h2>
+      <div className="pdf-upload-header">
+        <h2>1. Upload medical data (PDF)</h2>
+        <button className="pdf-upload-skip" onClick={onReady} type="button">
+          Skip
+        </button>
+      </div>
       <p className="pdf-upload-hint">
         We extract text and medication names to check for conflicts when the doctor prescribes during the call.
       </p>
@@ -222,11 +227,36 @@ export function PdfUpload({ onReady, onDrugCount }: Props) {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .pdf-upload-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
         .pdf-upload h2 {
           font-size: 1.5rem;
-          margin-bottom: 8px;
+          margin: 0;
           color: var(--text-primary);
           font-weight: 600;
+        }
+        .pdf-upload-skip {
+          background: transparent;
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .pdf-upload-skip:hover {
+          border-color: var(--accent-primary);
+          color: var(--accent-primary);
+          background: var(--bg-hover);
+        }
+        .pdf-upload-skip:active {
+          transform: scale(0.95);
         }
         .pdf-upload-hint {
           font-size: 0.9rem;
